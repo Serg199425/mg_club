@@ -1,11 +1,11 @@
 $(document).ready(function() {
-  renderer = new PIXI.CanvasRenderer(window.innerWidth, window.innerHeight);
+  renderer = new PIXI.CanvasRenderer(window.innerWidth - 20, window.innerHeight - 20);
   renderer.backgroundColor = 0x00DDFF;
 
   document.body.appendChild(renderer.view);
 
   pos_x = window.innerWidth / 2;
-  pos_y = window.innerHeight / 2 + 80;
+  pos_y = window.innerHeight / 2 + 60;
   rotation = 0;
 
   speed_x = 0;
@@ -27,6 +27,10 @@ function render() {
   current_plane.position.x = pos_x;
   current_plane.position.y = pos_y;
   current_plane.rotation = rotation;
+  iron_man.position.x = window.innerWidth / 2;;
+  iron_man.position.y = pos_y - 360;
+  iron_man.scale.x = 0.25;
+  iron_man.scale.y = 0.25;
   planes_index == 0 ? planes_index = 1 : planes_index = 0;
   scene.addChild(iron_man);
   scene.addChild(current_plane);
@@ -40,9 +44,9 @@ function draw_plane(pos_x, pos_y, variant) {
     fire.lineStyle(5, 0xFF0000);
     fire.beginFill(0xFF9108);
     fire.moveTo(0,0);
-    fire.lineTo(50, 20);
+    fire.lineTo(60, 20);
     fire.lineTo(40, 12);
-    fire.lineTo(100, 35);
+    fire.lineTo(110, 35);
     fire.lineTo(80, 0);
     fire.lineTo(90, -25);
     fire.lineTo(40, -8);
@@ -62,9 +66,9 @@ function draw_plane(pos_x, pos_y, variant) {
     fire.lineTo(40, 8);
     fire.lineTo(90, 25);
     fire.lineTo(80, 0);
-    fire.lineTo(100, -35);
+    fire.lineTo(110, -35);
     fire.lineTo(40, -12);
-    fire.lineTo(50, -20);
+    fire.lineTo(60, -20);
     fire.position.x = pos_x - 1;
     fire.position.y = pos_y + 280;
     fire.endFill();
@@ -181,14 +185,14 @@ function draw_plane(pos_x, pos_y, variant) {
   star.position.y = pos_y + 175;
   plane.addChild(star);
 
-  plane.scale.x = 0.6;
-  plane.scale.y = 0.8;
+  plane.scale.x = 0.4;
+  plane.scale.y = 0.6;
   return plane;
 }
 
 function draw_iron_man() {
-  var pos_x = 150;
-  var pos_y = 150;
+  var pos_x = 0;
+  var pos_y = 0;
   iron_man = new PIXI.DisplayObjectContainer();
 
   var head = new PIXI.Graphics();
