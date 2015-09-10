@@ -1,5 +1,5 @@
 $(document).ready(function() {
-  renderer = new PIXI.CanvasRenderer(window.innerWidth - 100, window.innerHeight - 100);
+  renderer = new PIXI.CanvasRenderer(window.innerWidth, window.innerHeight);
   renderer.backgroundColor = 0x00DDFF;
 
   document.body.appendChild(renderer.view);
@@ -11,7 +11,8 @@ $(document).ready(function() {
   speed_x = 0;
   speed_y = 0;
 
-  planes = [draw_plane(0, 0, 0), draw_plane(0, 0, 1)]
+  planes = [draw_plane(0, 0, 0), draw_plane(0, 0, 1)];
+  iron_man = draw_iron_man();
 });
 
 var MAX_SPEED_X = 10;
@@ -21,12 +22,15 @@ var planes_index = 0;
 
 
 function render() {
+  var scene = new PIXI.DisplayObjectContainer();
   var current_plane = planes[planes_index];
   current_plane.position.x = pos_x;
   current_plane.position.y = pos_y;
   current_plane.rotation = rotation;
   planes_index == 0 ? planes_index = 1 : planes_index = 0;
-  renderer.render(current_plane);
+  scene.addChild(iron_man);
+  scene.addChild(current_plane);
+  renderer.render(scene);
 }
 
 function draw_plane(pos_x, pos_y, variant) {
@@ -183,7 +187,226 @@ function draw_plane(pos_x, pos_y, variant) {
 }
 
 function draw_iron_man() {
-  
+  var pos_x = 150;
+  var pos_y = 150;
+  iron_man = new PIXI.DisplayObjectContainer();
+
+  var head = new PIXI.Graphics();
+  head.beginFill(0xFF3f15);
+  head.moveTo(0,0);
+  head.lineTo(10, 0);
+  head.lineTo(20, 10);
+  head.lineTo(20, 30);
+  head.lineTo(10, 40);
+  head.lineTo(-10, 40);
+  head.lineTo(-20, 30);
+  head.lineTo(-20, 10);
+  head.lineTo(-10, 0);
+  head.position.x = pos_x;
+  head.position.y = pos_y;
+  head.endFill();
+  iron_man.addChild(head);
+
+  //right arm up
+
+  var head = new PIXI.Graphics();
+  head.beginFill(0xecdc3d);
+  head.moveTo(0,0);
+  head.lineTo(10, 0);
+  head.lineTo(15, 5);
+  head.lineTo(25, 30);
+  head.lineTo(20, 60);
+  head.lineTo(5, 60);
+  head.lineTo(0, 30);
+
+  head.position.x = pos_x + 35;
+  head.position.y = pos_y + 50;
+  head.endFill();
+  iron_man.addChild(head);
+
+  //left arm up
+  var head = head.clone();
+  head.position.x = pos_x - 35;
+  head.position.y = pos_y + 50;
+  head.scale.x = -1;
+  head.endFill();
+  iron_man.addChild(head);
+
+  //right arm down
+
+  var head = new PIXI.Graphics();
+  head.beginFill(0xFF0000);
+  head.moveTo(5,0);
+  head.lineTo(10, 0);
+  head.lineTo(15, 5);
+  head.lineTo(25, 30);
+  head.lineTo(20, 60);
+  head.lineTo(5, 60);
+  head.lineTo(0, 30);
+
+
+  head.position.x = pos_x + 35;
+  head.position.y = pos_y + 70;
+  head.endFill();
+  iron_man.addChild(head);
+
+  //left arm down
+  var head = head.clone();
+  head.position.x = pos_x - 35;
+  head.position.y = pos_y + 70;
+  head.scale.x = -1;
+  head.endFill();
+  iron_man.addChild(head);
+
+
+  //body
+  var head = new PIXI.Graphics();
+  head.beginFill(0xFF3f15);
+  head.moveTo(0,0);
+  head.lineTo(20, 0);
+  head.lineTo(45, 10);
+  head.lineTo(45, 40);
+  head.lineTo(25, 80);
+  head.lineTo(-25, 80);
+  head.lineTo(-45, 40);
+  head.lineTo(-45, 10);
+  head.lineTo(-20, 0);
+  head.position.x = pos_x;
+  head.position.y = pos_y + 35;
+  head.endFill();
+  iron_man.addChild(head);
+
+  var head = new PIXI.Graphics();
+  head.beginFill(0xecdc3d);
+  head.moveTo(0,0);
+  head.lineTo(25, 0);
+  head.lineTo(25, 10);
+  head.lineTo(-25, 10);
+  head.lineTo(-25, 0);
+  head.position.x = pos_x;
+  head.position.y = pos_y + 115;
+  head.endFill();
+  iron_man.addChild(head);
+
+  var head = new PIXI.Graphics();
+  head.beginFill(0xFF0000);
+  head.moveTo(0,0);
+  head.lineTo(25, 0);
+  head.lineTo(35, 20);
+  head.lineTo(35, 40);
+  head.lineTo(25, 70);
+  head.lineTo(10, 70);
+  head.lineTo(0, 40);
+
+  head.position.x = pos_x;
+  head.position.y = pos_y + 125;
+  head.endFill();
+  iron_man.addChild(head);
+
+  var head = head.clone();
+  head.position.x = pos_x;
+  head.position.y = pos_y + 125;
+  head.scale.x = -1;
+  head.endFill();
+  iron_man.addChild(head);
+
+  //leg low
+
+  var head = new PIXI.Graphics();
+  head.beginFill(0xFF00000);
+  head.moveTo(0,0);
+  head.lineTo(25, 0);
+  head.lineTo(33, 20);
+  head.lineTo(33, 40);
+  head.lineTo(25, 70);
+  head.lineTo(10, 70);
+  head.lineTo(3, 40);
+  head.lineTo(3, 20);
+  head.lineTo(10, 0);
+
+  head.position.x = pos_x;
+  head.position.y = pos_y + 185;
+  head.endFill();
+  iron_man.addChild(head);
+
+  var head = head.clone();
+  head.position.x = pos_x;
+  head.position.y = pos_y + 185;
+  head.scale.x = -1;
+  head.endFill();
+  iron_man.addChild(head);
+
+  //foot
+
+  var head = new PIXI.Graphics();
+  head.beginFill(0xecdc3d);
+  head.moveTo(0,-3);
+  head.lineTo(20, -3);
+  head.lineTo(23, 5);
+  head.lineTo(18, 20);
+  head.lineTo(5, 20);
+  head.lineTo(0, 5);
+  head.lineTo(5, -3);
+
+  head.position.x = pos_x + 5;
+  head.position.y = pos_y + 255;
+  head.scale.y = 1.5
+  head.endFill();
+  iron_man.addChild(head);
+
+  var head = head.clone();
+  head.position.x = pos_x - 6;
+  head.position.y = pos_y + 255;
+  head.scale.x = -1;
+  head.scale.y = 1.5;
+  head.endFill();
+  iron_man.addChild(head);
+
+  //palm
+
+  var head = head.clone();
+  head.position.x = pos_x + 35;
+  head.position.y = pos_y + 130;
+  iron_man.addChild(head);
+
+  var head = head.clone();
+  head.position.x = pos_x - 60;
+  head.position.y = pos_y + 130;
+  iron_man.addChild(head);
+
+  //back
+  var head = new PIXI.Graphics();
+  head.beginFill(0xecdc3d);
+  head.moveTo(0,0);
+  head.lineTo(25, 0);
+  head.lineTo(35, 20);
+  head.lineTo(35, 40);
+  head.lineTo(25, 80);
+  head.lineTo(10, 80);
+  head.lineTo(0, 40);
+  head.lineTo(0, 20);
+  head.lineTo(10, 0);
+
+  head.position.x = pos_x - 18;
+  head.position.y = pos_y + 35;
+  head.endFill();
+  iron_man.addChild(head);
+
+  var head = new PIXI.Graphics();
+  head.beginFill(0xFF0000);
+  head.moveTo(0,0);
+  head.lineTo(5, 0);
+  head.lineTo(5, 80);
+  head.lineTo(-5, 80);
+  head.lineTo(-5, 0);
+
+  head.position.x = pos_x;
+  head.position.y = pos_y + 35;
+  head.endFill();
+  iron_man.addChild(head);
+
+
+  return iron_man;
 }
 
 
