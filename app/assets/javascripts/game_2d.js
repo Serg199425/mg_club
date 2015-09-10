@@ -11,33 +11,89 @@ $(document).ready(function() {
   speed_x = 0;
   speed_y = 0;
 
-  planes = [draw_plane(0, 0, 0), draw_plane(0, 0, 1)];
-  iron_man = draw_iron_man();
+  plane = new Plane(pos_x, pos_y);
+  iron_man = new IronMan(pos_x, pos_y - 360);
+
+  interval = setInterval(render, 10);
 });
-
-var MAX_SPEED_X = 10;
-var SPEED_UP_STEP = 2;
-var direction = 0;
-var planes_index = 0;
-
 
 function render() {
   var scene = new PIXI.DisplayObjectContainer();
-  var current_plane = planes[planes_index];
-  current_plane.position.x = pos_x;
-  current_plane.position.y = pos_y;
-  current_plane.rotation = rotation;
-  iron_man.position.x = window.innerWidth / 2;;
-  iron_man.position.y = pos_y - 360;
-  iron_man.scale.x = 0.25;
-  iron_man.scale.y = 0.25;
-  planes_index == 0 ? planes_index = 1 : planes_index = 0;
-  scene.addChild(iron_man);
-  scene.addChild(current_plane);
+  plane.update_position();
+  scene.addChild(iron_man.get_model());
+  scene.addChild(plane.get_model());
   renderer.render(scene);
 }
 
-function draw_plane(pos_x, pos_y, variant) {
+$(document).on('keydown', function(e) {
+
+  switch(e.keyCode) {
+    case 37: 
+      plane.change_speed(-1);
+      break;
+    case 39:
+      plane.change_speed(1);
+    default: return;
+  }
+});
+
+function Plane (pos_x, pos_y) {
+  this.pos_x = pos_x;
+  this.pos_y = pos_y;
+  this.LEFT_BORDER = 60;
+  this.RIGHT_BORDER = window.innerWidth - 80;
+  this.rotation = 0;
+
+  this.MAX_SPEED_X = 10;
+  this.SPEED_UP_STEP = 2;
+  this.speed_x = 0;
+
+  this.model_index = 0;
+  this.models = [this.draw(0), this.draw(1)];
+}
+
+Plane.prototype.get_model = function() {
+  this.model_index == 0 ? this.model_index = 1 : this.model_index = 0;
+  this.models[this.model_index].position.x = this.pos_x;
+  this.models[this.model_index].position.y = this.pos_y;
+  this.models[this.model_index].rotation = this.rotation;
+  return this.models[this.model_index];
+}
+
+Plane.prototype.change_speed = function(direction) {
+  this.direction = direction;
+  this.speed_x += this.direction * this.SPEED_UP_STEP
+  if (Math.abs(this.speed_x) > this.MAX_SPEED_X)
+    this.speed_x = this.direction * this.MAX_SPEED_X;
+}
+
+Plane.prototype.update_position = function() {
+  this.pos_x += this.speed_x;
+  if (this.pos_x < this.LEFT_BORDER) {
+    this.pos_x = this.LEFT_BORDER;
+    this.speed_x = 0;
+  }
+  if (this.pos_x > this.RIGHT_BORDER) {
+    this.pos_x = this.RIGHT_BORDER
+    this.speed_x = 0;
+  }
+}
+
+function IronMan(pos_x, pos_y) {
+  this.pos_x = pos_x;
+  this.pos_y = pos_y;
+  this.model = this.draw();
+}
+
+IronMan.prototype.get_model = function() {
+  this.model.position.x = this.pos_x;
+  this.model.position.y = this.pos_y;
+  return this.model
+}
+
+Plane.prototype.draw = function (variant) {
+  var pos_x = 0;
+  var pos_y = 0;
   var plane = new PIXI.DisplayObjectContainer();
   if (variant == 0) {
     var fire = new PIXI.Graphics();
@@ -190,7 +246,7 @@ function draw_plane(pos_x, pos_y, variant) {
   return plane;
 }
 
-function draw_iron_man() {
+IronMan.prototype.draw = function () {
   var pos_x = 0;
   var pos_y = 0;
   iron_man = new PIXI.DisplayObjectContainer();
@@ -409,36 +465,11 @@ function draw_iron_man() {
   head.endFill();
   iron_man.addChild(head);
 
+  iron_man.scale.x = 0.25;
+  iron_man.scale.y = 0.25;
 
   return iron_man;
 }
-
-
-function update_position() {
-  if (direction != 0) {
-    Math.abs(speed_x) < MAX_SPEED_X ? speed_x += direction * SPEED_UP_STEP : speed_x = direction * MAX_SPEED_X;
-  } else {
-      if (speed_x !=0)
-        speed_x > 0 ? speed_x -= SPEED_UP_STEP / 2 : speed_x += SPEED_UP_STEP / 2
-  }
-  direction = 0;
-  pos_x += speed_x;
-}
-
-$(document).on('keydown', function(e) {
-
-  switch(e.keyCode) {
-    case 37: 
-      direction = -1;
-      break;
-    case 39:
-      direction = 1; 
-    default: return;
-  }
-});
-
-interval = setInterval(render, 10);
-interval = setInterval(update_position, 30);
 
 
 
