@@ -17,12 +17,23 @@ $(document).ready(function() {
   interval = setInterval(render, 10);
 });
 
+var LEFT_BORDER = 60;
+var RIGHT_BORDER = window.innerWidth - 80;
+var UP_BORDER = 0;
+var MAX_SPEED_X = 10;
+var SPEED_UP_STEP = 2;
+var BULLET_SPEED_Y = 10;
+
 function render() {
   var scene = new PIXI.DisplayObjectContainer();
-  plane.update_position();
+  plane.move();
+  iron_man.check_collision(plane.bullets);
   scene.addChild(iron_man.get_model());
+  for (var i = 0; i < plane.bullets.length; i++ )
+    scene.addChild(plane.bullets[i].get_model());
   scene.addChild(plane.get_model());
   renderer.render(scene);
+  delete scene;
 }
 
 $(document).on('keydown', function(e) {
@@ -33,6 +44,13 @@ $(document).on('keydown', function(e) {
       break;
     case 39:
       plane.change_speed(1);
+      break;
+    case 0:
+      plane.shoot();
+      break;
+    case 32:
+      plane.shoot();
+      break;
     default: return;
   }
 });
@@ -40,16 +58,11 @@ $(document).on('keydown', function(e) {
 function Plane (pos_x, pos_y) {
   this.pos_x = pos_x;
   this.pos_y = pos_y;
-  this.LEFT_BORDER = 60;
-  this.RIGHT_BORDER = window.innerWidth - 80;
   this.rotation = 0;
-
-  this.MAX_SPEED_X = 10;
-  this.SPEED_UP_STEP = 2;
   this.speed_x = 0;
-
   this.model_index = 0;
   this.models = [this.draw(0), this.draw(1)];
+  this.bullets = [];
 }
 
 Plane.prototype.get_model = function() {
@@ -60,22 +73,40 @@ Plane.prototype.get_model = function() {
   return this.models[this.model_index];
 }
 
+Plane.prototype.move = function() {
+  this.update_position();
+  this.update_bullets_position();
+}
+
 Plane.prototype.change_speed = function(direction) {
   this.direction = direction;
-  this.speed_x += this.direction * this.SPEED_UP_STEP
-  if (Math.abs(this.speed_x) > this.MAX_SPEED_X)
-    this.speed_x = this.direction * this.MAX_SPEED_X;
+  this.speed_x += this.direction * SPEED_UP_STEP
+  if (Math.abs(this.speed_x) > MAX_SPEED_X)
+    this.speed_x = this.direction * MAX_SPEED_X;
+}
+
+Plane.prototype.shoot = function() {
+  this.bullets.push(new Bullet(this.pos_x + 30, this.pos_y + 120));
+  this.bullets.push(new Bullet(this.pos_x - 30, this.pos_y + 120));
 }
 
 Plane.prototype.update_position = function() {
   this.pos_x += this.speed_x;
-  if (this.pos_x < this.LEFT_BORDER) {
-    this.pos_x = this.LEFT_BORDER;
+  if (this.pos_x < LEFT_BORDER) {
+    this.pos_x = LEFT_BORDER;
     this.speed_x = 0;
   }
-  if (this.pos_x > this.RIGHT_BORDER) {
-    this.pos_x = this.RIGHT_BORDER
+  if (this.pos_x > RIGHT_BORDER) {
+    this.pos_x = RIGHT_BORDER
     this.speed_x = 0;
+  }
+}
+
+Plane.prototype.update_bullets_position = function() {
+  for (var i = 0; i < this.bullets.length; i++) {
+    if (this.bullets[i].move() == false) {
+      this.bullets.splice(i,i);
+    }
   }
 }
 
@@ -83,12 +114,115 @@ function IronMan(pos_x, pos_y) {
   this.pos_x = pos_x;
   this.pos_y = pos_y;
   this.model = this.draw();
+  this.is_boom = false;
+  this.boom_model = this.boom_draw();
 }
 
 IronMan.prototype.get_model = function() {
-  this.model.position.x = this.pos_x;
-  this.model.position.y = this.pos_y;
-  return this.model
+  if (this.is_boom == false) {
+    this.model.position.x = this.pos_x;
+    this.model.position.y = this.pos_y;
+    return this.model;
+  } else {
+    this.boom_model.position.x = this.pos_x;
+    this.boom_model.position.y = this.pos_y;
+    this.is_boom = false;
+    return this.boom_model;
+  }
+}
+
+IronMan.prototype.check_collision = function(bullets) {
+  for (var i = 0; i < bullets.length; i++) {
+    if (bullets[i].pos_x <= this.pos_x + 20 &&
+        bullets[i].pos_x >= this.pos_x - 20 &&
+        bullets[i].pos_y < UP_BORDER + 50)
+      this.is_boom = true;
+  }
+}
+
+function Bullet(pos_x, pos_y) {
+  this.pos_x = pos_x;
+  this.pos_y = pos_y;
+  this.speed_y = BULLET_SPEED_Y;
+  this.models = [this.draw(1), this.draw(0)];
+  this.model_index = 0;
+}
+
+Bullet.prototype.move = function() {
+  this.pos_y -= BULLET_SPEED_Y;
+  return this.pos_y < UP_BORDER ? false : true;
+}
+
+Bullet.prototype.get_model = function() {
+  this.model_index == 0 ? this.model_index = 1 : this.model_index = 0;
+  this.models[this.model_index].position.x = this.pos_x;
+  this.models[this.model_index].position.y = this.pos_y;
+  return this.models[this.model_index];
+}
+
+Bullet.prototype.draw = function(variant) {
+  var pos_x = 0;
+  var pos_y = 0;
+  var plane = new PIXI.DisplayObjectContainer();
+  if (variant == 0) {
+    var fire = new PIXI.Graphics();
+    fire.lineStyle(5, 0xFF0000);
+    fire.beginFill(0xFF9108);
+    fire.moveTo(0,0);
+    fire.lineTo(60, 20);
+    fire.lineTo(40, 12);
+    fire.lineTo(110, 35);
+    fire.lineTo(80, 0);
+    fire.lineTo(90, -25);
+    fire.lineTo(40, -8);
+    fire.lineTo(50, -20);
+    fire.position.x = pos_x + 1;
+    fire.position.y = pos_y + 200;
+    fire.endFill();
+    fire.scale.y = 1.5;
+    fire.rotation = Math.PI / 2;
+    plane.addChild(fire);
+  } else {
+    var fire = new PIXI.Graphics();
+    fire.lineStyle(5, 0xFF0000);
+    fire.beginFill(0xFF9108);
+    fire.moveTo(0,0);
+    fire.lineTo(50, 20);
+    fire.lineTo(40, 8);
+    fire.lineTo(90, 25);
+    fire.lineTo(80, 0);
+    fire.lineTo(110, -35);
+    fire.lineTo(40, -12);
+    fire.lineTo(60, -20);
+    fire.position.x = pos_x - 1;
+    fire.position.y = pos_y + 200;
+    fire.scale.y = 1.5;
+    fire.endFill();
+    fire.rotation = rotation + Math.PI / 2;
+    plane.addChild(fire);
+  }
+
+  var front = new PIXI.Graphics();
+  front.beginFill(0xA0A0A0);
+  front.moveTo(0,0);
+  front.lineTo(10, 30);
+  front.lineTo(-10, 30);
+  front.position.x = pos_x;
+  front.position.y = pos_y;
+  front.endFill();
+  plane.addChild(front);
+
+  var ellipse = new PIXI.Graphics();
+  ellipse.beginFill(0xA0A0A0);
+  ellipse.drawEllipse(0,0, 20, 80);
+  ellipse.position.x = pos_x;
+  ellipse.position.y = pos_y + 100;
+  plane.addChild(ellipse);
+
+  plane.scale.x = 0.15;
+  plane.scale.y = 0.15;
+
+  return plane;
 }
 
 Plane.prototype.draw = function (variant) {
@@ -246,10 +380,36 @@ Plane.prototype.draw = function (variant) {
   return plane;
 }
 
+IronMan.prototype.boom_draw = function() {
+  var pos_x = 0;
+  var pos_y = 0;
+  var plane = new PIXI.DisplayObjectContainer();
+  var star = new PIXI.Graphics();
+  star.beginFill(0xFF9108);
+  star.lineStyle(5, 0xFF0000);
+  star.moveTo(0,0);
+  star.lineTo(15, 20);
+  star.lineTo(35, 15);
+  star.lineTo(30, 30);
+  star.lineTo(55, 50);
+  star.lineTo(20, 45);
+  star.lineTo(-5, 60);
+  star.lineTo(-10, 40);
+  star.lineTo(-35, 20);
+  star.lineTo(-10, 15);
+  star.scale.x = 1.4
+  star.scale.y = 1.4
+  star.endFill();
+
+  plane.addChild(star);
+
+  return plane;
+}
+
 IronMan.prototype.draw = function () {
   var pos_x = 0;
   var pos_y = 0;
-  iron_man = new PIXI.DisplayObjectContainer();
+  var iron_man = new PIXI.DisplayObjectContainer();
 
   var head = new PIXI.Graphics();
   head.beginFill(0xFF3f15);
