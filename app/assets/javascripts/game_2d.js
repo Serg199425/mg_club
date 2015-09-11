@@ -31,7 +31,7 @@ var BOOM_SPEED = 20;
 var BOOM_DURATION_CIRCLES = 100;
 var CLOUD_SPEED_X = 1;
 var CLOUD_SPEED_Y = 20;
-var IRON_MAN_SPEED_X = 10;
+var IRON_MAN_SPEED_X = 5;
 var IRON_MAN_RADAR_RADIUS = 150;
 
 function update_enviroment() {
@@ -162,6 +162,7 @@ function IronMan(pos_x, pos_y) {
   this.model = this.draw();
   this.boom_model = this.boom_draw();
   this.boom_duration = 0;
+  this.speed_x = 0;
 }
 
 IronMan.prototype.get_model = function() {
@@ -194,6 +195,7 @@ IronMan.prototype.check_collision = function(bullets) {
 }
 
 IronMan.prototype.move = function(bullets) {
+  if (this.boom_duration > 0) return;
   var collision_is_near = false;
   var clothest_bullets = [];
   var direction = 0;
@@ -222,7 +224,8 @@ IronMan.prototype.move = function(bullets) {
 
     direction > 0 ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
   } else {
-    this.speed_x = 0;
+    if (Math.abs(this.pos_x - WIDTH / 2) > IRON_MAN_SPEED_X)
+      (this.pos_x - WIDTH / 2 < 0) ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
   }
 
   this.pos_x += this.speed_x;
