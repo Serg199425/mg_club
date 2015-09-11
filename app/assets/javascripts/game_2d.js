@@ -55,19 +55,30 @@ function render() {
 }
 
 $(document).on('keydown', function(e) {
-
   switch(e.keyCode) {
     case 37: 
-      plane.change_speed(-1);
+      plane.start_move(-1);
       break;
     case 39:
-      plane.change_speed(1);
+      plane.start_move(1);
       break;
     case 0:
       plane.shoot();
       break;
     case 32:
       plane.shoot();
+      break;
+    default: return;
+  }
+});
+
+$(document).on('keyup', function(e) {
+  switch(e.keyCode) {
+    case 37: 
+      plane.stop_move();
+      break;
+    case 39:
+      plane.stop_move();
       break;
     default: return;
   }
@@ -110,11 +121,12 @@ Plane.prototype.move = function() {
   this.update_bullets_position();
 }
 
-Plane.prototype.change_speed = function(direction) {
-  this.direction = direction;
-  this.speed_x += this.direction * SPEED_UP_STEP;
-  if (Math.abs(this.speed_x) > MAX_SPEED_X)
-    this.speed_x = this.direction * MAX_SPEED_X;
+Plane.prototype.start_move = function(direction) {
+  this.speed_x = direction * MAX_SPEED_X;
+}
+
+Plane.prototype.stop_move = function() {
+  this.speed_x = 0;
 }
 
 Plane.prototype.shoot = function() {
@@ -124,8 +136,6 @@ Plane.prototype.shoot = function() {
 
 Plane.prototype.update_position = function() {
   this.pos_x += this.speed_x;
-  if (this.speed_x != 0)
-    this.speed_x -= this.direction * SPEED_DOWN_STEP;
   if (this.pos_x < LEFT_BORDER) {
     this.pos_x = LEFT_BORDER;
     this.speed_x = 0;
