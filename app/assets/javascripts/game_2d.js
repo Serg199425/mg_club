@@ -220,12 +220,14 @@ IronMan.prototype.move = function(bullets) {
     });
 
     for (var i = 0; i < clothest_bullets.length; i++)
-      clothest_bullets[i].pos_x <= this.pos_x ? direction += 1 : direction -= 1;
+      clothest_bullets[i].pos_x <= this.pos_x ? direction += 1 / (i + 1) : direction -= 1 / (i + 1);
 
     direction > 0 ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
   } else {
     if (Math.abs(this.pos_x - WIDTH / 2) > IRON_MAN_SPEED_X)
       (this.pos_x - WIDTH / 2 < 0) ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
+    else
+      this.speed_x = 0;
   }
 
   this.pos_x += this.speed_x;
