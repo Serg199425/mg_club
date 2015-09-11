@@ -24,12 +24,15 @@ var RIGHT_BORDER = window.innerWidth - 80;
 var UP_BORDER = 0;
 var DOWN_BORDER = window.innerHeight;
 var MAX_SPEED_X = 10;
-var SPEED_UP_STEP = 2;
+var SPEED_UP_STEP = 5;
+var SPEED_DOWN_STEP = 1;
 var BULLET_SPEED_Y = 10;
 var BOOM_SPEED = 20;
 var BOOM_DURATION_CIRCLES = 100;
 var CLOUD_SPEED_X = 1;
-var CLOUD_SPEED_Y = 30;
+var CLOUD_SPEED_Y = 20;
+var IRON_MAN_SPEED_X = 10;
+var IRON_MAN_RADAR_RADIUS = 150;
 
 function update_enviroment() {
   if (Math.random() < 0.5) enviroment.add_cloud();
@@ -39,6 +42,7 @@ function render() {
   var scene = new PIXI.Container();
   plane.move();
   enviroment.move();
+  iron_man.move(plane.bullets);
   iron_man.check_collision(plane.bullets);
   scene.addChild(iron_man.get_model());
   for (var i = 0; i < plane.bullets.length; i++ )
@@ -108,7 +112,7 @@ Plane.prototype.move = function() {
 
 Plane.prototype.change_speed = function(direction) {
   this.direction = direction;
-  this.speed_x += this.direction * SPEED_UP_STEP
+  this.speed_x += this.direction * SPEED_UP_STEP;
   if (Math.abs(this.speed_x) > MAX_SPEED_X)
     this.speed_x = this.direction * MAX_SPEED_X;
 }
@@ -120,6 +124,8 @@ Plane.prototype.shoot = function() {
 
 Plane.prototype.update_position = function() {
   this.pos_x += this.speed_x;
+  if (this.speed_x != 0)
+    this.speed_x -= this.direction * SPEED_DOWN_STEP;
   if (this.pos_x < LEFT_BORDER) {
     this.pos_x = LEFT_BORDER;
     this.speed_x = 0;
@@ -171,8 +177,52 @@ IronMan.prototype.check_collision = function(bullets) {
   for (var i = 0; i < bullets.length; i++) {
     if (bullets[i].pos_x <= this.pos_x + 20 &&
         bullets[i].pos_x >= this.pos_x - 20 &&
-        bullets[i].pos_y < UP_BORDER + 50)
+        bullets[i].pos_y < UP_BORDER + 50 &&
+        bullets[i].pos_y > UP_BORDER)
       this.boom_duration += 1;
+  }
+}
+
+IronMan.prototype.move = function(bullets) {
+  var collision_is_near = false;
+  var clothest_bullets = [];
+  var direction = 0;
+
+  for (var i = 0; i < bullets.length; i++) {
+    if (bullets[i].pos_x <= this.pos_x + IRON_MAN_RADAR_RADIUS &&
+        bullets[i].pos_x >= this.pos_x - IRON_MAN_RADAR_RADIUS && 
+        bullets[i].pos_y > UP_BORDER) {
+      clothest_bullets.push(bullets[i])
+      collision_is_near = true;
+    }
+  }
+
+  if (collision_is_near == true) {
+    clothest_bullets.sort(function(a, b) {
+      if (a.pos_y < b.pos_y)
+        return -1;
+      if (a.pos_y > b.pos_y)
+        return 1;
+      if (a.pos_y == b.pos_y)
+        return 0;
+    });
+
+    for (var i = 0; i < clothest_bullets.length; i++)
+      clothest_bullets[i].pos_x <= this.pos_x ? direction += 1 : direction -= 1;
+
+    direction > 0 ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
+  } else {
+    this.speed_x = 0;
+  }
+
+  this.pos_x += this.speed_x;
+  if (this.pos_x < LEFT_BORDER) {
+    this.pos_x = LEFT_BORDER;
+    this.speed_x = 0;
+  }
+  if (this.pos_x > RIGHT_BORDER) {
+    this.pos_x = RIGHT_BORDER
+    this.speed_x = 0;
   }
 }
 
