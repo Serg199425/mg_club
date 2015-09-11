@@ -1,38 +1,49 @@
 $(document).ready(function() {
   renderer = new PIXI.CanvasRenderer(window.innerWidth - 20, window.innerHeight - 20);
-  renderer.backgroundColor = 0x00DDFF;
+  renderer.backgroundColor = 0x00BBFF;
 
   document.body.appendChild(renderer.view);
 
-  width = window.innerWidth - 20;
-  height = window.innerHeight - 20;
+  WIDTH = window.innerWidth - 20;
+  HEIGHT = window.innerHeight - 20;
   rotation = 0;
 
   speed_x = 0;
   speed_y = 0;
 
-  plane = new Plane(width / 2, height - 250 );
-  iron_man = new IronMan(width / 2, 20);
+  plane = new Plane(WIDTH / 2, HEIGHT - 250 );
+  iron_man = new IronMan(WIDTH / 2, 20);
+  enviroment = new Enviroment();
 
   interval = setInterval(render, 10);
+  move_interval = setInterval(update_enviroment, 100);
 });
 
 var LEFT_BORDER = 60;
 var RIGHT_BORDER = window.innerWidth - 80;
 var UP_BORDER = 0;
+var DOWN_BORDER = window.innerHeight;
 var MAX_SPEED_X = 10;
 var SPEED_UP_STEP = 2;
 var BULLET_SPEED_Y = 10;
 var BOOM_SPEED = 20;
 var BOOM_DURATION_CIRCLES = 100;
+var CLOUD_SPEED_X = 1;
+var CLOUD_SPEED_Y = 30;
+
+function update_enviroment() {
+  if (Math.random() < 0.5) enviroment.add_cloud();
+}
 
 function render() {
   var scene = new PIXI.Container();
   plane.move();
+  enviroment.move();
   iron_man.check_collision(plane.bullets);
   scene.addChild(iron_man.get_model());
   for (var i = 0; i < plane.bullets.length; i++ )
     scene.addChild(plane.bullets[i].get_model());
+  scene.addChild(enviroment.get_model());
   scene.addChild(plane.get_fire());
   scene.addChild(plane.get_model());
   renderer.render(scene);
@@ -71,7 +82,6 @@ function Plane (pos_x, pos_y) {
 }
 
 Plane.prototype.get_model = function() {
-  // this.model_index == 0 ? this.model_index = 1 : this.model_index = 0;
   this.speed_x == 0 ? this.model_index = 0: this.model_index = 1;
   var model = this.models[this.model_index];
   model.position.x = this.pos_x;
@@ -126,6 +136,8 @@ Plane.prototype.update_bullets_position = function() {
       this.bullets.splice(i,i);
     }
   }
+
+  if (this.bullets.length == 1) this.bullets = [];
 }
 
 function IronMan(pos_x, pos_y) {
@@ -183,6 +195,76 @@ Bullet.prototype.get_model = function() {
   this.models[this.model_index].position.y = this.pos_y;
   return this.models[this.model_index];
 }
+
+function Cloud(pos_x, pos_y) {
+  this.pos_x = pos_x;
+  this.pos_y = pos_y;
+  this.speed_x = CLOUD_SPEED_X;
+  this.speed_y = CLOUD_SPEED_Y;
+  this.model = this.draw();
+}
+
+function Enviroment() {
+  this.clouds = [];
+}
+
+Enviroment.prototype.add_cloud = function() {
+  this.clouds.push(new Cloud(Math.random() * WIDTH, -500)); 
+}
+
+Enviroment.prototype.move = function() {
+  for (var i = 0; i < this.clouds.length; i++) {
+    if (this.clouds[i].move() == false) {
+      this.clouds.splice(i,i);
+    }
+  }
+}
+
+Enviroment.prototype.get_model = function() {
+  var enviroment_models = new PIXI.Container();
+  for (var i = 0; i < this.clouds.length; i++)
+    enviroment_models.addChild(this.clouds[i].get_model());
+  return enviroment_models;
+}
+
+Cloud.prototype.move = function() {
+  this.pos_x += (Math.random() * 2 - 1) * CLOUD_SPEED_X;
+  this.pos_y += CLOUD_SPEED_Y;
+  return this.pos_y > DOWN_BORDER ? false : true;
+}
+
+Cloud.prototype.get_model = function() {
+  this.model.position.x = this.pos_x;
+  this.model.position.y = this.pos_y;
+  return this.model;
+}
+
+//drawing
+
+Cloud.prototype.draw = function() {
+  var pos_x = 0;
+  var pos_y = 0;
+  var cloud = new PIXI.Container();
+
+  var side = 1;
+  for (var i = 0; i < 10; i++) {
+    var ellipse = new PIXI.Graphics();
+    ellipse.beginFill(0xFFFFFF);
+    ellipse.drawEllipse(0,0, 50 + Math.random() * 40, 50 + Math.random() * 40);
+    ellipse.alpha = Math.random() / 2 + 0.5;
+    ellipse.position.x = pos_x + side * (3 + Math.random()) * 10;
+    ellipse.position.y = pos_y + 100;
+    cloud.addChild(ellipse);
+    pos_x += Math.random() * 60 - 30;
+    pos_y += Math.random() * 60 - 30;
+    side > 0 ? side = -1 : side = 1;
+  }
+
+  cloud.scale.x = 1 + Math.random();
+  cloud.scale.y = 1 + Math.random();
+  return cloud;
+}
+
 
 Bullet.prototype.draw = function(variant) {
   var pos_x = 0;
@@ -536,7 +618,7 @@ Plane.prototype.draw = function () {
 
 IronMan.prototype.boom_draw = function() {
   var pos_x = 0;
-  var pos_y = 5.5 * this.boom_duration;
+  var pos_y = 0;
   var plane = new PIXI.Container();
   var star = new PIXI.Graphics();
   star.beginFill(0xFF9108);
@@ -551,8 +633,8 @@ IronMan.prototype.boom_draw = function() {
   star.lineTo(-10, 40);
   star.lineTo(-35, 20);
   star.lineTo(-10, 15);
-  star.scale.x = 1 + this.boom_duration / 90;
-  star.scale.y = 1 + this.boom_duration / 90;
+  star.scale.x = 1 + this.boom_duration / 100;
+  star.scale.y = 1 + this.boom_duration / 100;
   star.position.y = pos_y;
   star.endFill();
 
