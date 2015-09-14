@@ -893,24 +893,40 @@ IronMan.prototype.boom_draw = function() {
   iron_man.scale.y = 0.25;
 
 
-  var star = new PIXI.Graphics();
-  star.beginFill(0xFF9108);
-  star.lineStyle(5, 0xFF0000);
-  star.moveTo(0,0);
-  star.lineTo(15, 20);
-  star.lineTo(35, 15);
-  star.lineTo(30, 30);
-  star.lineTo(55, 50);
-  star.lineTo(20, 45);
-  star.lineTo(-5, 60);
-  star.lineTo(-10, 40);
-  star.lineTo(-35, 20);
-  star.lineTo(-10, 15);
-  star.scale.x = 4 + this.boom_duration / 100;
-  star.scale.y = 4 + this.boom_duration / 100;
-  star.position.y = pos_y;
-  star.endFill();
-  iron_man.addChild(star);
+  // var star = new PIXI.Graphics();
+  // star.beginFill(0xFF9108);
+  // star.lineStyle(5, 0xFF0000);
+  // star.moveTo(0,0);
+  // star.lineTo(15, 20);
+  // star.lineTo(35, 15);
+  // star.lineTo(30, 30);
+  // star.lineTo(55, 50);
+  // star.lineTo(20, 45);
+  // star.lineTo(-5, 60);
+  // star.lineTo(-10, 40);
+  // star.lineTo(-35, 20);
+  // star.lineTo(-10, 15);
+  // star.scale.x = 4 + this.boom_duration / 100;
+  // star.scale.y = 4 + this.boom_duration / 100;
+  // star.position.y = pos_y;
+  // star.endFill();
+  // iron_man.addChild(star);
+  var side = 1;
+
+  for (var i = 0; i < 10; i++) {
+    var ellipse = new PIXI.Graphics();
+    ellipse.beginFill(0x0051ff);
+    ellipse.drawEllipse(0,0, 20 + this.boom_duration / 2, 20 + this.boom_duration / 2);
+    ellipse.alpha = 1 - this.boom_duration / BOOM_DURATION_CIRCLES;
+    ellipse.position.x = pos_x + side * (6 + 3 * Math.random()) * 10;
+    ellipse.position.y = pos_y + 100;
+    ellipse.scale.x = 3 + Math.random();
+    ellipse.scale.y = 3 + Math.random();
+    iron_man.addChild(ellipse);
+    pos_x += Math.random() * 60 - 30;
+    pos_y += Math.random() * 60 - 30;
+    side > 0 ? side = -1 : side = 1;
+  }
 
   return iron_man;
 }
