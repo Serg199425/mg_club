@@ -1,23 +1,10 @@
-$(document).ready(function() {
-  WIDTH = window.innerWidth - 20;
-  HEIGHT = window.innerHeight - 20;
+$(document).on('ready', function() {
+  initialize_renderer();
+  initialize_objects();
 
-  renderer = new PIXI.CanvasRenderer(WIDTH, HEIGHT);
-  renderer.backgroundColor = 0x00BBFF;
-
-  document.body.appendChild(renderer.view);
-  rotation = 0;
-
-  speed_x = 0;
-  speed_y = 0;
-
-  plane = new Plane(WIDTH / 2, HEIGHT - 250 );
-  iron_man = new IronMan(WIDTH / 2, 20);
-  enviroment = new Enviroment();
-
-  render_interval = setInterval(render, 10);
-  move_interval = setInterval(move_objects, 50);
-  enviroment_interval = setInterval(update_enviroment, 300);
+  window.onresize = function(event) {
+    resize();
+  };
 });
 
 var LEFT_BORDER = 60;
@@ -34,7 +21,86 @@ var CLOUD_SPEED_X = 1;
 var CLOUD_SPEED_Y = 20;
 var CLOUD_BOOM_SPEED = 40;
 var IRON_MAN_SPEED_X = 5;
-var IRON_MAN_RADAR_RADIUS = 150;
+var IRON_MAN_RADAR_RADIUS = 200;
+var RELOAD_TIME = 10;
+var game_is_started = false;
+
+function render() {
+  move_objects();
+  renderer.render(create_scene());
+}
+
+function render_with_text() {
+  renderer.render(create_scene_with_text());
+}
+
+function resize() {
+  WIDTH = window.innerWidth - 20;
+  HEIGHT = window.innerHeight - 20;
+  RIGHT_BORDER = WIDTH - 80;
+  DOWN_BORDER = window.innerWidth;
+
+  renderer.resize(WIDTH, HEIGHT);
+
+  if (game_is_started == false) {
+    plane.pos_x = iron_man.pos_x = WIDTH / 2;
+  }
+
+  plane.pos_y = HEIGHT - 250;
+}
+
+function initialize_renderer() {
+  WIDTH = window.innerWidth - 20;
+  HEIGHT = window.innerHeight - 20;
+
+  renderer = new PIXI.CanvasRenderer(WIDTH, HEIGHT);
+  renderer.backgroundColor = 0x00BBFF;
+  document.body.appendChild(renderer.view);
+}
+
+function initialize_objects() {
+  plane = new Plane(WIDTH / 2, HEIGHT - 250 );
+  iron_man = new IronMan(WIDTH / 2, 20);
+  enviroment = new Enviroment();
+  show_press_text = true;
+  interval = setInterval(render_with_text, 200);
+}
+
+function start() {
+  if (game_is_started) return;
+  game_is_started = true;
+  clearInterval(interval);
+  render_interval = setInterval(render, 10);
+  move_interval = setInterval(move_objects, 50);
+  enviroment_interval = setInterval(update_enviroment, 200);
+}
+
+function create_scene() {
+  var scene = new PIXI.Container();
+  scene.addChild(enviroment.get_model());
+  scene.addChild(iron_man.get_model());
+  scene.addChild(plane.get_model());
+  return scene;
+};
+
+function create_scene_with_text() {
+  var scene = create_scene();
+  var text_style = {font: "bold 35px Snippet", fill: "white", dropShadow: true };
+  var target_text = new PIXI.Text('DESTROY THE IRON MAN', text_style);
+  var press_text = new PIXI.Text('press [enter] to start', text_style);
+  target_text.position.x = WIDTH / 2 - target_text.width / 2;
+  target_text.position.y = HEIGHT / 2 - 100;
+  press_text.position.x = WIDTH / 2 - press_text.width / 2;
+  press_text.position.y = HEIGHT / 2 - 50;
+  scene.addChild(target_text);
+  if (show_press_text) {
+    scene.addChild(press_text);
+    show_press_text = false;
+  } else {
+    show_press_text = true;
+  }
+  return scene;
+}
 
 function update_enviroment() {
   enviroment.add_cloud(iron_man);
@@ -47,33 +113,29 @@ function move_objects() {
   iron_man.check_collision(plane.bullets);
 }
 
-function create_scene() {
-  var scene = new PIXI.Container();
-  scene.addChild(iron_man.get_model());
-  for (var i = 0; i < plane.bullets.length; i++ )
-    scene.addChild(plane.bullets[i].get_model());
-  scene.addChild(enviroment.get_model());
-  scene.addChild(plane.get_fire());
-  scene.addChild(plane.get_model());
-  return scene;
-};
-
-function render() {
-  move_objects();
-  renderer.render(create_scene());
-}
-
 var keys = {};
+var previous_keys = {};
 
 $(document).keydown(function (e) {
-    keys[e.which] = true;
+    keys[e.which] = true; 
 
-    if (keys[37] == true)
+    if (keys[13] && game_is_started == false) {
+      start();
+      return;
+    }
+
+    if (game_is_started == false)
+      return;
+
+    if (keys[37] && !keys[39] || keys[37] && keys[39] && plane.speed_x > 0) {
       plane.start_move(-1);
-    if (keys[39] == true)
-      plane.start_move(1);
-    if (keys[32] == true)
+    } else {
+      if (keys[39] && !keys[37] || keys[37] && keys[39] && plane.speed_x < 0)
+        plane.start_move(1);
+    }
+    if (keys[32])
       plane.shoot();
+    previous_keys = keys;
 });
 
 $(document).keyup(function (e) {
@@ -89,34 +151,53 @@ function Plane (pos_x, pos_y) {
   this.speed_x = 0;
   this.model_index = 0;
   this.models = [this.draw(), this.draw_in_motion()];
+  this.fire_side = 1;
   this.fire_models = this.draw_fire();
   this.fire_model_index = 0;
+  this.reload_time = 0;
   this.bullets = [];
 }
 
 Plane.prototype.get_model = function() {
+  var container = new PIXI.Container();
+  container.addChild(this.get_fire());
+  container.addChild(this.get_bullets());
+  container.addChild(this.get_plane());
+  return container;
+}
+
+Plane.prototype.get_plane = function() {
   this.speed_x == 0 ? this.model_index = 0: this.model_index = 1;
   var model = this.models[this.model_index];
   model.position.x = this.pos_x;
   model.position.y = this.pos_y;
-  model.rotation = this.rotation;
-  if (this.speed_x > 0) 
-    model.scale.x = - 0.6;
-  else
-    model.scale.x = 0.6; 
+  this.speed_x > 0 ? model.scale.x = - 0.6 : model.scale.x = 0.6; 
   return model;
 }
 
 Plane.prototype.get_fire = function() {
   this.fire_model_index == 0 ? this.fire_model_index = 1 : this.fire_model_index = 0;
-  this.fire_models[this.fire_model_index].position.x = this.pos_x;
+  this.fire_models[this.fire_model_index].position.x = this.pos_x + this.fire_side;
+  this.fire_side > 0 ? this.fire_side = -1 : this.fire_side = 1; 
   this.fire_models[this.fire_model_index].position.y = this.pos_y + 170;
   return this.fire_models[this.fire_model_index];
 }
 
+Plane.prototype.get_bullets = function() {
+  var bullets = new PIXI.Container();
+  for (var i = 0; i < this.bullets.length; i++ )
+    bullets.addChild(this.bullets[i].get_model());
+  return bullets;
+}
+
 Plane.prototype.move = function() {
+  this.reload();
   this.update_position();
   this.update_bullets_position();
+}
+
+Plane.prototype.reload = function() {
+  if (this.reload_time > 0) this.reload_time--;
 }
 
 Plane.prototype.start_move = function(direction) {
@@ -128,6 +209,8 @@ Plane.prototype.stop_move = function() {
 }
 
 Plane.prototype.shoot = function() {
+  if (this.reload_time > 0) return;
+  this.reload_time = RELOAD_TIME;
   this.bullets.push(new Bullet(this.pos_x + 30, this.pos_y + 120));
   this.bullets.push(new Bullet(this.pos_x - 30, this.pos_y + 120));
 }
@@ -183,8 +266,8 @@ IronMan.prototype.get_model = function() {
 IronMan.prototype.check_collision = function(bullets) {
   if (this.boom_duration != 0) return;
   for (var i = 0; i < bullets.length; i++) {
-    if (bullets[i].pos_x <= this.pos_x + 20 &&
-        bullets[i].pos_x >= this.pos_x - 20 &&
+    if (bullets[i].pos_x <= this.pos_x + this.model.width / 1.8 &&
+        bullets[i].pos_x >= this.pos_x - this.model.width / 1.8 &&
         bullets[i].pos_y < UP_BORDER + 50 &&
         bullets[i].pos_y > UP_BORDER)
       this.boom_duration += 1;
@@ -313,93 +396,57 @@ Cloud.prototype.get_model = function() {
 //drawing
 
 Cloud.prototype.draw = function() {
-  var pos_x = 0;
-  var pos_y = 0;
-  var cloud = new PIXI.Container();
+  var pos_y = 0, side = 1, pos_x = 0;
+  var graphics = new PIXI.Graphics();
 
-  var side = 1;
   for (var i = 0; i < 10; i++) {
-    var ellipse = new PIXI.Graphics();
-    ellipse.beginFill(0xFFFFFF);
-    ellipse.drawEllipse(0,0, 50 + Math.random() * 40, 50 + Math.random() * 40);
-    ellipse.alpha = Math.random() / 2 + 0.5;
-    ellipse.position.x = pos_x + side * (3 + Math.random()) * 10;
-    ellipse.position.y = pos_y + 100;
-    cloud.addChild(ellipse);
+    graphics.beginFill(0xFFFFFF);
+    graphics.drawEllipse(pos_x + side * (3 + Math.random()) * 10, 
+      pos_y + 100, 50 + Math.random() * 40, 50 + Math.random() * 40);
     pos_x += Math.random() * 60 - 30;
     pos_y += Math.random() * 60 - 30;
     side > 0 ? side = -1 : side = 1;
   }
 
-  cloud.scale.x = 1 + Math.random();
-  cloud.scale.y = 1 + Math.random();
-  return cloud;
+  graphics.scale.x = 1 + Math.random();
+  graphics.scale.y = 1 + Math.random();
+  graphics.alpha = Math.random() / 2 + 0.2;
+  return graphics;
 }
 
 
 Bullet.prototype.draw = function(variant) {
   var pos_x = 0;
   var pos_y = 0;
-  var plane = new PIXI.Container();
-  if (variant == 0) {
-    var fire = new PIXI.Graphics();
-    fire.lineStyle(5, 0xFF0000);
-    fire.beginFill(0xFF9108);
-    fire.moveTo(0,0);
-    fire.lineTo(60, 20);
-    fire.lineTo(40, 12);
-    fire.lineTo(110, 35);
-    fire.lineTo(80, 0);
-    fire.lineTo(90, -25);
-    fire.lineTo(40, -8);
-    fire.lineTo(50, -20);
-    fire.position.x = pos_x + 1;
-    fire.position.y = pos_y + 200;
-    fire.endFill();
-    fire.scale.y = 1.5;
-    fire.rotation = Math.PI / 2;
-    plane.addChild(fire);
-  } else {
-    var fire = new PIXI.Graphics();
-    fire.lineStyle(5, 0xFF0000);
-    fire.beginFill(0xFF9108);
-    fire.moveTo(0,0);
-    fire.lineTo(50, 20);
-    fire.lineTo(40, 8);
-    fire.lineTo(90, 25);
-    fire.lineTo(80, 0);
-    fire.lineTo(110, -35);
-    fire.lineTo(40, -12);
-    fire.lineTo(60, -20);
-    fire.position.x = pos_x - 1;
-    fire.position.y = pos_y + 200;
-    fire.scale.y = 1.5;
-    fire.endFill();
-    fire.rotation = rotation + Math.PI / 2;
-    plane.addChild(fire);
-  }
+  var bullet = new PIXI.Container();
+  var graphics = new PIXI.Graphics();
+  graphics.lineStyle(5, 0xFF0000);
+  graphics.beginFill(0xFF9108);
+  graphics.moveTo(0, 150);
+  graphics.lineTo(20, 200 + Math.random() * 10);
+  graphics.lineTo(12, 190 + Math.random() * 20);
+  graphics.lineTo(35, 240 + Math.random() * 30);
+  graphics.lineTo(0, 230);
+  graphics.lineTo(-35, 240 + Math.random() * 30);
+  graphics.lineTo(-12, 190 + Math.random() * 20);
+  graphics.lineTo(-20, 200 + Math.random() * 10);
+  graphics.endFill();
 
-  var front = new PIXI.Graphics();
-  front.beginFill(0xA0A0A0);
-  front.moveTo(0,0);
-  front.lineTo(10, 30);
-  front.lineTo(-10, 30);
-  front.position.x = pos_x;
-  front.position.y = pos_y;
-  front.endFill();
-  plane.addChild(front);
+  graphics.beginFill(0xAAAAAA);
+  graphics.moveTo(0,0);
+  graphics.lineTo(10, 30);
+  graphics.lineTo(-10, 30);
+  graphics.endFill();
 
-  var ellipse = new PIXI.Graphics();
-  ellipse.beginFill(0xA0A0A0);
-  ellipse.drawEllipse(0,0, 20, 80);
-  ellipse.position.x = pos_x;
-  ellipse.position.y = pos_y + 100;
-  plane.addChild(ellipse);
+  graphics.beginFill(0x666666);
+  graphics.lineStyle(0);
+  graphics.drawEllipse(0,30, 10, 30);
+  graphics.endFill();
 
-  plane.scale.x = 0.15;
-  plane.scale.y = 0.15;
+  graphics.scale.x = 0.25;
+  graphics.scale.y = 0.35;
 
-  return plane;
+  return graphics;
 }
 
 Plane.prototype.draw_fire = function(variant) {
@@ -409,14 +456,14 @@ Plane.prototype.draw_fire = function(variant) {
   fire1.lineStyle(5, 0xFF0000);
   fire1.beginFill(0xFF9108);
   fire1.moveTo(0,0);
-  fire1.lineTo(60, 20);
-  fire1.lineTo(40, 12);
-  fire1.lineTo(110, 35);
+  fire1.lineTo(50 + Math.random() * 10, 20);
+  fire1.lineTo(40, 8 + Math.random() * 8);
+  fire1.lineTo(90 + Math.random() * 40, 35);
   fire1.lineTo(80, 0);
-  fire1.lineTo(90, -25);
-  fire1.lineTo(40, -8);
+  fire1.lineTo(90, -25 - Math.random() * 10);
+  fire1.lineTo(40, -8 - Math.random() * 8);
   fire1.lineTo(50, -20);
-  fire1.position.x = pos_x + 1;
+  fire1.position.x = pos_x + 10;
   fire1.position.y = pos_y + 280;
   fire1.endFill();
   fire1.rotation = Math.PI / 2;
@@ -432,10 +479,10 @@ Plane.prototype.draw_fire = function(variant) {
   fire2.lineTo(110, -35);
   fire2.lineTo(40, -12);
   fire2.lineTo(60, -20);
-  fire2.position.x = pos_x - 1;
+  fire2.position.x = pos_x - 10;
   fire2.position.y = pos_y + 280;
   fire2.endFill();
-  fire2.rotation = rotation + Math.PI / 2;
+  fire2.rotation = Math.PI / 2;
 
   fire1.scale.x = 0.8;
   fire1.scale.y = 0.4;
