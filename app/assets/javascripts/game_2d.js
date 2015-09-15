@@ -16,7 +16,7 @@ $(document).ready(function() {
   enviroment = new Enviroment();
 
   interval = setInterval(render, 10);
-  move_interval = setInterval(update_enviroment, 100);
+  move_interval = setInterval(update_enviroment, 400);
 });
 
 var LEFT_BORDER = 60;
@@ -35,13 +35,13 @@ var IRON_MAN_SPEED_X = 5;
 var IRON_MAN_RADAR_RADIUS = 150;
 
 function update_enviroment() {
-  if (Math.random() < 0.5) enviroment.add_cloud();
+  enviroment.add_cloud(iron_man);
 }
 
 function render() {
   var scene = new PIXI.Container();
   plane.move();
-  enviroment.move();
+  enviroment.move(iron_man);
   iron_man.move(plane.bullets);
   iron_man.check_collision(plane.bullets);
   scene.addChild(iron_man.get_model());
@@ -149,11 +149,10 @@ Plane.prototype.update_position = function() {
 Plane.prototype.update_bullets_position = function() {
   for (var i = 0; i < this.bullets.length; i++) {
     if (this.bullets[i].move() == false) {
-      this.bullets.splice(i,i);
+      this.bullets.splice(i,1);
+      i--;
     }
   }
-
-  if (this.bullets.length == 1) this.bullets = [];
 }
 
 function IronMan(pos_x, pos_y) {
@@ -251,7 +250,7 @@ function Bullet(pos_x, pos_y) {
 
 Bullet.prototype.move = function() {
   this.pos_y -= BULLET_SPEED_Y;
-  return this.pos_y < UP_BORDER ? false : true;
+  return this.pos_y < UP_BORDER - 100 ? false : true;
 }
 
 Bullet.prototype.get_model = function() {
@@ -273,14 +272,16 @@ function Enviroment() {
   this.clouds = [];
 }
 
-Enviroment.prototype.add_cloud = function() {
+Enviroment.prototype.add_cloud = function(iron_man) {
+  if (iron_man.boom_duration > 0) return;
   this.clouds.push(new Cloud(Math.random() * WIDTH, -500)); 
 }
 
-Enviroment.prototype.move = function() {
+Enviroment.prototype.move = function(iron_man) {
   for (var i = 0; i < this.clouds.length; i++) {
-    if (this.clouds[i].move() == false) {
-      this.clouds.splice(i,i);
+    if (this.clouds[i].move(iron_man) == false) {
+      this.clouds.splice(i,1);
+      i--;
     }
   }
 }
@@ -685,7 +686,7 @@ IronMan.prototype.boom_draw = function() {
   var pos_x = 0;
   var pos_y = 0;
   var iron_man = new PIXI.Container();
-  var boom_position = 10 * this.boom_duration
+  var boom_position = 70 * this.boom_duration
 
   var head = new PIXI.Graphics();
   head.beginFill(0xFF3f15);
@@ -787,13 +788,6 @@ IronMan.prototype.boom_draw = function() {
   head.endFill();
   iron_man.addChild(head);
 
-  var head = head.clone();
-  head.position.x = pos_x;
-  head.position.y = pos_y + 125;
-  head.scale.x = -1;
-  head.endFill();
-  iron_man.addChild(head);
-
   //leg low
 
   var head = new PIXI.Graphics();
@@ -835,14 +829,6 @@ IronMan.prototype.boom_draw = function() {
   head.position.x = pos_x + 5 - boom_position;
   head.position.y = pos_y + 255 + boom_position * 2;
   head.scale.y = 1.5
-  head.endFill();
-  iron_man.addChild(head);
-
-  var head = head.clone();
-  head.position.x = pos_x - 6;
-  head.position.y = pos_y + 255;
-  head.scale.x = -1;
-  head.scale.y = 1.5;
   head.endFill();
   iron_man.addChild(head);
 
@@ -911,21 +897,23 @@ IronMan.prototype.boom_draw = function() {
   // star.position.y = pos_y;
   // star.endFill();
   // iron_man.addChild(star);
-  var side = 1;
-
-  for (var i = 0; i < 10; i++) {
-    var ellipse = new PIXI.Graphics();
-    ellipse.beginFill(0x0051ff);
-    ellipse.drawEllipse(0,0, 20 + this.boom_duration / 2, 20 + this.boom_duration / 2);
-    ellipse.alpha = 1 - this.boom_duration / BOOM_DURATION_CIRCLES;
-    ellipse.position.x = pos_x + side * (6 + 3 * Math.random()) * 10;
-    ellipse.position.y = pos_y + 100;
-    ellipse.scale.x = 3 + Math.random();
-    ellipse.scale.y = 3 + Math.random();
-    iron_man.addChild(ellipse);
-    pos_x += Math.random() * 60 - 30;
-    pos_y += Math.random() * 60 - 30;
-    side > 0 ? side = -1 : side = 1;
+  
+  if (this.boom_duration != 0) {
+    var side = 1;
+    for (var i = 0; i < 10; i++) {
+      var ellipse = new PIXI.Graphics();
+      ellipse.beginFill(0x0051ff);
+      ellipse.drawEllipse(0,0, 20 + this.boom_duration / 10, 20 + this.boom_duration / 10);
+      ellipse.alpha = 1 - this.boom_duration / BOOM_DURATION_CIRCLES;
+      ellipse.position.x = pos_x + side * 70;
+      ellipse.position.y = pos_y + 100;
+      ellipse.scale.x = 3 + this.boom_duration;
+      ellipse.scale.y = 3 + this.boom_duration;
+      iron_man.addChild(ellipse);
+      pos_x += Math.random() * 160 - 30;
+      pos_y += Math.random() * 160 - 30;
+      side > 0 ? side = -1 : side = 1;
+    }
   }
 
   return iron_man;
