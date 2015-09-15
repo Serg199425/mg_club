@@ -1,3 +1,0 @@
-* simply game with pixi.js
-* run rails s
-* Press [left] and [right] to move and [space] to shoot.

@@ -15,8 +15,9 @@ $(document).ready(function() {
   iron_man = new IronMan(WIDTH / 2, 20);
   enviroment = new Enviroment();
 
-  interval = setInterval(render, 10);
-  move_interval = setInterval(update_enviroment, 400);
+  render_interval = setInterval(render, 10);
+  move_interval = setInterval(move_objects, 50);
+  enviroment_interval = setInterval(update_enviroment, 300);
 });
 
 var LEFT_BORDER = 60;
@@ -31,6 +32,7 @@ var BOOM_SPEED = 20;
 var BOOM_DURATION_CIRCLES = 100;
 var CLOUD_SPEED_X = 1;
 var CLOUD_SPEED_Y = 20;
+var CLOUD_BOOM_SPEED = 40;
 var IRON_MAN_SPEED_X = 5;
 var IRON_MAN_RADAR_RADIUS = 150;
 
@@ -38,20 +40,27 @@ function update_enviroment() {
   enviroment.add_cloud(iron_man);
 }
 
-function render() {
-  var scene = new PIXI.Container();
+function move_objects() {
   plane.move();
   enviroment.move(iron_man);
   iron_man.move(plane.bullets);
   iron_man.check_collision(plane.bullets);
+}
+
+function create_scene() {
+  var scene = new PIXI.Container();
   scene.addChild(iron_man.get_model());
   for (var i = 0; i < plane.bullets.length; i++ )
     scene.addChild(plane.bullets[i].get_model());
   scene.addChild(enviroment.get_model());
   scene.addChild(plane.get_fire());
   scene.addChild(plane.get_model());
-  renderer.render(scene);
-  delete scene;
+  return scene;
+};
+
+function render() {
+  move_objects();
+  renderer.render(create_scene());
 }
 
 $(document).on('keydown', function(e) {
@@ -293,9 +302,16 @@ Enviroment.prototype.get_model = function() {
   return enviroment_models;
 }
 
-Cloud.prototype.move = function() {
-  this.pos_x += (Math.random() * 2 - 1) * CLOUD_SPEED_X;
-  this.pos_y += CLOUD_SPEED_Y;
+Cloud.prototype.move = function(iron_man) {
+  if (iron_man.boom_duration > 0) {
+    this.speed_x = CLOUD_SPEED_X / (this.pos_x - iron_man.pos_x);
+    this.pos_y - iron_man.pos_y > 0 ? this.speed_y = CLOUD_SPEED_Y : this.speed_y = - CLOUD_SPEED_Y;
+  } else {
+    this.speed_x = CLOUD_SPEED_X;
+    this.speed_y = CLOUD_SPEED_Y;
+  }
+  this.pos_x += this.speed_x;
+  this.pos_y += this.speed_y;
   return this.pos_y > DOWN_BORDER ? false : true;
 }
 
@@ -508,7 +524,7 @@ Plane.prototype.draw_in_motion = function (variant) {
   plane.addChild(body);
 
   var ellipse = new PIXI.Graphics();
-  ellipse.beginFill(0x00AAFF);
+  ellipse.beginFill(0x0077FF);
   ellipse.drawEllipse(0,0, 15, 50);
   ellipse.position.x = pos_x - 10;
   ellipse.position.y = pos_y + 90;
@@ -532,32 +548,32 @@ Plane.prototype.draw_in_motion = function (variant) {
   tail.position.y = pos_y + 250;
   plane.addChild(tail);
 
-  // var star = new PIXI.Graphics();
-  // star.beginFill(0xFF0000);
-  // star.moveTo(0,0);
-  // star.lineTo(10, 20);
-  // star.lineTo(35, 20);
-  // star.lineTo(15, 30);
-  // star.lineTo(25, 50);
-  // star.lineTo(0, 35);
-  // star.lineTo(-25, 50);
-  // star.lineTo(-15, 30);
-  // star.lineTo(-35, 20);
-  // star.lineTo(-10, 20);
-  // star.position.x = pos_x - 65;
-  // star.position.y = pos_y + 185;
-  // star.scale.x = 0.55
-  // star.scale.y = 0.55
-  // star.endFill();
+  var star = new PIXI.Graphics();
+  star.beginFill(0xFF0000);
+  star.moveTo(0,0);
+  star.lineTo(10, 20);
+  star.lineTo(35, 20);
+  star.lineTo(15, 30);
+  star.lineTo(25, 50);
+  star.lineTo(0, 35);
+  star.lineTo(-25, 50);
+  star.lineTo(-15, 30);
+  star.lineTo(-35, 20);
+  star.lineTo(-10, 20);
+  star.position.x = pos_x - 70;
+  star.position.y = pos_y + 170;
+  star.scale.x = 0.5;
+  star.scale.y = 0.8;
+  star.endFill();
 
-  // plane.addChild(star);
+  plane.addChild(star);
 
-  // var star = star.clone();
-  // star.scale.x = 0.55
-  // star.scale.y = 0.55
-  // star.position.x = pos_x + 70;
-  // star.position.y = pos_y + 185;
-  // plane.addChild(star);
+  var star = star.clone();
+  star.scale.x = 0.5;
+  star.scale.y = 0.8;
+  star.position.x = pos_x + 70;
+  star.position.y = pos_y + 170;
+  plane.addChild(star);
 
   plane.scale.x = 0.4;
   plane.scale.y = 0.6;
@@ -630,7 +646,7 @@ Plane.prototype.draw = function () {
   plane.addChild(body);
 
   var ellipse = new PIXI.Graphics();
-  ellipse.beginFill(0x00AAFF);
+  ellipse.beginFill(0x0077FF);
   ellipse.drawEllipse(0,0, 15, 50);
   ellipse.position.x = pos_x;
   ellipse.position.y = pos_y + 90;
@@ -650,32 +666,32 @@ Plane.prototype.draw = function () {
   body.position.y = pos_y + 250;
   plane.addChild(body);
 
-  // var star = new PIXI.Graphics();
-  // star.beginFill(0xFF0000);
-  // star.moveTo(0,0);
-  // star.lineTo(10, 20);
-  // star.lineTo(35, 20);
-  // star.lineTo(15, 30);
-  // star.lineTo(25, 50);
-  // star.lineTo(0, 35);
-  // star.lineTo(-25, 50);
-  // star.lineTo(-15, 30);
-  // star.lineTo(-35, 20);
-  // star.lineTo(-10, 20);
-  // star.position.x = pos_x - 70;
-  // star.position.y = pos_y + 175;
-  // star.scale.x = 0.6
-  // star.scale.y = 0.6
-  // star.endFill();
+  var star = new PIXI.Graphics();
+  star.beginFill(0xFF0000);
+  star.moveTo(0,0);
+  star.lineTo(10, 20);
+  star.lineTo(35, 20);
+  star.lineTo(15, 30);
+  star.lineTo(25, 50);
+  star.lineTo(0, 35);
+  star.lineTo(-25, 50);
+  star.lineTo(-15, 30);
+  star.lineTo(-35, 20);
+  star.lineTo(-10, 20);
+  star.position.x = pos_x - 70;
+  star.position.y = pos_y + 170;
+  star.scale.x = 0.6;
+  star.scale.y = 0.8
+  star.endFill();
 
-  // plane.addChild(star);
+  plane.addChild(star);
 
-  // var star = star.clone();
-  // star.scale.x = 0.6
-  // star.scale.y = 0.6
-  // star.position.x = pos_x + 70;
-  // star.position.y = pos_y + 175;
-  // plane.addChild(star);
+  var star = star.clone();
+  star.scale.x = 0.6;
+  star.scale.y = 0.8;
+  star.position.x = pos_x + 70;
+  star.position.y = pos_y + 170;
+  plane.addChild(star);
 
   plane.scale.x = 0.4;
   plane.scale.y = 0.6;
@@ -700,7 +716,7 @@ IronMan.prototype.boom_draw = function() {
   head.lineTo(-20, 10);
   head.lineTo(-10, 0);
   head.position.x = pos_x;
-  head.position.y = pos_y - boom_position;
+  head.position.y = pos_y + boom_position;
   head.endFill();
   iron_man.addChild(head);
 
@@ -717,7 +733,7 @@ IronMan.prototype.boom_draw = function() {
   head.lineTo(0, 30);
 
   head.position.x = pos_x + 35 + boom_position / 3;
-  head.position.y = pos_y + 50 - boom_position;
+  head.position.y = pos_y + 50 + boom_position;
   head.endFill();
   iron_man.addChild(head);
 
@@ -784,7 +800,7 @@ IronMan.prototype.boom_draw = function() {
   head.lineTo(0, 40);
 
   head.position.x = pos_x;
-  head.position.y = pos_y + 125 - boom_position;
+  head.position.y = pos_y + 125 + boom_position;
   head.endFill();
   iron_man.addChild(head);
 
@@ -858,7 +874,7 @@ IronMan.prototype.boom_draw = function() {
   head.lineTo(10, 0);
 
   head.position.x = pos_x - 18 + boom_position * 2;
-  head.position.y = pos_y + 35 - boom_position / 4;
+  head.position.y = pos_y + 35 + boom_position / 4;
   head.endFill();
   iron_man.addChild(head);
 
@@ -871,32 +887,12 @@ IronMan.prototype.boom_draw = function() {
   head.lineTo(-5, 0);
 
   head.position.x = pos_x + boom_position * 2;
-  head.position.y = pos_y + 35 - boom_position / 6;
+  head.position.y = pos_y + 35 + boom_position / 6;
   head.endFill();
   iron_man.addChild(head);
 
   iron_man.scale.x = 0.25;
   iron_man.scale.y = 0.25;
-
-
-  // var star = new PIXI.Graphics();
-  // star.beginFill(0xFF9108);
-  // star.lineStyle(5, 0xFF0000);
-  // star.moveTo(0,0);
-  // star.lineTo(15, 20);
-  // star.lineTo(35, 15);
-  // star.lineTo(30, 30);
-  // star.lineTo(55, 50);
-  // star.lineTo(20, 45);
-  // star.lineTo(-5, 60);
-  // star.lineTo(-10, 40);
-  // star.lineTo(-35, 20);
-  // star.lineTo(-10, 15);
-  // star.scale.x = 4 + this.boom_duration / 100;
-  // star.scale.y = 4 + this.boom_duration / 100;
-  // star.position.y = pos_y;
-  // star.endFill();
-  // iron_man.addChild(star);
   
   if (this.boom_duration != 0) {
     var side = 1;
@@ -907,14 +903,16 @@ IronMan.prototype.boom_draw = function() {
       ellipse.alpha = 1 - this.boom_duration / BOOM_DURATION_CIRCLES;
       ellipse.position.x = pos_x + side * 70;
       ellipse.position.y = pos_y + 100;
-      ellipse.scale.x = 3 + this.boom_duration;
-      ellipse.scale.y = 3 + this.boom_duration;
+      ellipse.scale.x = this.boom_duration / 1.2;
+      ellipse.scale.y = this.boom_duration / 1.2;
       iron_man.addChild(ellipse);
       pos_x += Math.random() * 160 - 30;
       pos_y += Math.random() * 160 - 30;
       side > 0 ? side = -1 : side = 1;
     }
   }
+
+  iron_man.rotation += Math.PI * this.boom_duration / 1000;
 
   return iron_man;
 }
