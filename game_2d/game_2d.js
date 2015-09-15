@@ -1,11 +1,11 @@
 $(document).ready(function() {
-  renderer = new PIXI.CanvasRenderer(window.innerWidth - 20, window.innerHeight - 20);
+  WIDTH = window.innerWidth - 20;
+  HEIGHT = window.innerHeight - 20;
+
+  renderer = new PIXI.CanvasRenderer(WIDTH, HEIGHT);
   renderer.backgroundColor = 0x00BBFF;
 
   document.body.appendChild(renderer.view);
-
-  WIDTH = window.innerWidth - 20;
-  HEIGHT = window.innerHeight - 20;
   rotation = 0;
 
   speed_x = 0;
@@ -63,34 +63,23 @@ function render() {
   renderer.render(create_scene());
 }
 
-$(document).on('keydown', function(e) {
-  switch(e.keyCode) {
-    case 37: 
+var keys = {};
+
+$(document).keydown(function (e) {
+    keys[e.which] = true;
+
+    if (keys[37] == true)
       plane.start_move(-1);
-      break;
-    case 39:
+    if (keys[39] == true)
       plane.start_move(1);
-      break;
-    case 0:
+    if (keys[32] == true)
       plane.shoot();
-      break;
-    case 32:
-      plane.shoot();
-      break;
-    default: return;
-  }
 });
 
-$(document).on('keyup', function(e) {
-  switch(e.keyCode) {
-    case 37: 
+$(document).keyup(function (e) {
+    delete keys[e.which];
+    if (!keys[37] && !keys[39])
       plane.stop_move();
-      break;
-    case 39:
-      plane.stop_move();
-      break;
-    default: return;
-  }
 });
 
 function Plane (pos_x, pos_y) {
@@ -562,14 +551,14 @@ Plane.prototype.draw_in_motion = function (variant) {
   star.lineTo(-10, 20);
   star.position.x = pos_x - 70;
   star.position.y = pos_y + 170;
-  star.scale.x = 0.5;
+  star.scale.x = 0.4;
   star.scale.y = 0.8;
   star.endFill();
 
   plane.addChild(star);
 
   var star = star.clone();
-  star.scale.x = 0.5;
+  star.scale.x = 0.4;
   star.scale.y = 0.8;
   star.position.x = pos_x + 70;
   star.position.y = pos_y + 170;
@@ -766,7 +755,7 @@ IronMan.prototype.boom_draw = function() {
   //left arm down
   var head = head.clone();
   head.position.x = pos_x - 35 - boom_position / 3;
-  head.position.y = pos_y + 70 + boom_position / 4;
+  head.position.y = pos_y + 70 + boom_position / 2;
   head.scale.x = -1;
   head.endFill();
   iron_man.addChild(head);
@@ -852,7 +841,7 @@ IronMan.prototype.boom_draw = function() {
 
   var head = head.clone();
   head.position.x = pos_x + 35 + boom_position;
-  head.position.y = pos_y + 130 + boom_position / 10;
+  head.position.y = pos_y + 130 + boom_position / 3;
   iron_man.addChild(head);
 
   var head = head.clone();
@@ -887,7 +876,7 @@ IronMan.prototype.boom_draw = function() {
   head.lineTo(-5, 0);
 
   head.position.x = pos_x + boom_position * 2;
-  head.position.y = pos_y + 35 + boom_position / 6;
+  head.position.y = pos_y + 35 + boom_position;
   head.endFill();
   iron_man.addChild(head);
 
