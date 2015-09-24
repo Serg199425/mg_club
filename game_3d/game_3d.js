@@ -27,21 +27,13 @@ var IRON_MAN_RADAR_RADIUS = 200;
 var RELOAD_TIME = 10;
 var game_is_started = false;
 var MODELS_COUNT = 2;
+var WATER_SPEED = 10;
 
 function render() {
   requestAnimationFrame( render );
-  var delta = clock.getDelta(),
-  time = clock.getElapsedTime() * 10;
-  change_cylinder(time);
-  particleGroup.tick( 0.026 );
   renderer.render( scene, camera );
+  enviroment.move();
   stats.update();
-  water.material.uniforms.time.value += 1.0 / 60.0;
-  water.render();
-}
-
-function render_with_text() {
-  renderer.render(create_scene_with_text());
 }
 
 function onWindowResize() {
@@ -82,8 +74,6 @@ function initialize_objects() {
   clock = new THREE.Clock();
 
   camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 20000 );
-  // camera.position.z = 40;
-  // camera.position.y = 10;
   camera.position.z = 40;
   camera.position.y = 10;
   camera.rotateX(-Math.PI / 40);
@@ -93,133 +83,24 @@ function initialize_objects() {
   var light = new THREE.AmbientLight( 0xffffff ); // soft white light
   scene.add( light );
 
-  dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
-  dirLight.color.setHSL( 0.1, 1, 0.95 );
-  dirLight.position.set( -1, 1.75, 1 );
-  dirLight.position.multiplyScalar( 50 );
-  scene.add( dirLight );
+  var directional_light = new THREE.DirectionalLight(0xffff55, 1);
+  directional_light.position.set(-600, 300, 600);
+  scene.add(directional_light);
 
-  dirLight.castShadow = true;
+  plane = new Plane(scene, camera);
+  enviroment = new Enviroment(scene, directional_light);
 
-  dirLight.shadowMapWidth = 1048;
-  dirLight.shadowMapHeight = 1048;
-
-  var d = 50;
-
-  dirLight.shadowCameraLeft = -d;
-  dirLight.shadowCameraRight = d;
-  dirLight.shadowCameraTop = d;
-  dirLight.shadowCameraBottom = -d;
-
-  dirLight.shadowCameraFar = 3500;
-  dirLight.shadowBias = -0.0001;
-  dirLight.shadowDarkness = 0.35;
-  dirLight.shadowCameraVisible = true;
-  scene.add( dirLight );
-
-  var light = new THREE.AmbientLight( 0x404040 ); // soft white light
-  scene.add( light );
-
-  clock = new THREE.Clock();
-  controls = new THREE.FirstPersonControls( camera );
-
-  plane = new Plane(camera);
-
-    var geometry = new THREE.SphereGeometry( 150, 150, 50 );
-  var material = new THREE.MeshPhongMaterial( { color: 0x00AAfF } );
-  var mesh = new THREE.Mesh( geometry, material );
-  scene.add(mesh);
-  mesh.position.y = 20;
-
-  load_enviroment();
   load_models();
   testing();
 }
 
-function change_cylinder(time) {
-  aMeshMirror.rotation.x += 0.001;
-}
-
-function load_enviroment() {
-      var materials = [
-
-      loadTexture( 'models/skybox/px.jpg' ), // right
-      loadTexture( 'models/skybox/nx.jpg' ), // left
-      loadTexture( 'models/skybox/py.jpg' ), // top
-      loadTexture( 'models/skybox/ny.jpg' ), // bottom
-      loadTexture( 'models/skybox/pz.jpg' ), // back
-      loadTexture( 'models/skybox/nz.jpg' )  // front
-
-    ];
-
-    mesh = new THREE.Mesh( new THREE.BoxGeometry( 1500, 1500, 1500, 7, 7, 7 ), new THREE.MeshFaceMaterial( materials ) );
-    mesh.scale.x = - 1;
-    scene.add( mesh );
-}
-
-function loadTexture( path ) {
-
-        var texture = new THREE.Texture( container );
-        var material = new THREE.MeshBasicMaterial( { map: texture, overdraw: 0.5 } );
-
-        var image = new Image();
-        image.onload = function () {
-
-          texture.image = this;
-          texture.needsUpdate = true;
-
-        };
-        image.src = path;
-
-        return material;
-
-      }
-
 function testing() {
-  geometry = new THREE.CylinderGeometry( 5000, 5000, 1500, 1500);
-
-
-  var waterNormals = THREE.ImageUtils.loadTexture( 'models/ocean.jpg' );
-  waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
-
-  var directionalLight = new THREE.DirectionalLight(0xffff55, 1);
-    directionalLight.position.set(-600, 300, 600);
-    scene.add(directionalLight);
-
-  water = new THREE.Water(renderer, camera, scene, {
-      textureWidth: 512, 
-      textureHeight: 512,
-      waterNormals: waterNormals,
-      alpha:  1.0,
-      sunDirection: directionalLight.position.normalize(),
-      sunColor: 0xffffff,
-      waterColor: 0x001e0f,
-      distortionScale: 50.0
-  });
-
-  aMeshMirror = new THREE.Mesh(geometry, water.material);
-
-  aMeshMirror.rotateZ(Math.PI / 2);
-  aMeshMirror.position.y = -5000;
-  aMeshMirror.position.z = -700;
-
-  aMeshMirror.add(water);
-  aMeshMirror.rotation.x = - Math.PI * 0.5;
-  scene.add(aMeshMirror);
-
-  // var material = new THREE.MeshPhongMaterial( { map: waterNormals, transparent: true, opacity: 0.4, emissive: 0x111111, envMap: camera.renderTarget } );
-  // cylinder = new THREE.Mesh( geometry, material );
-  // cylinder.rotateZ(Math.PI / 2);
-  // cylinder.position.y = -5000;
-  // cylinder.position.z = -700;
-  // scene.add( cylinder );
 }
 
 function load_models() {
   var loader = new THREE.OBJMTLLoader();
 
   // load an obj / mtl resource pair
-  loader.crossOrigin = 'anonymous';
   loader.load(
     // OBJ resource URL
     'models/Mark_42.obj',
@@ -238,33 +119,10 @@ function load_models() {
       loaded_models += 1;
     }
   );
-
-  loader.load(
-    // OBJ resource URL
-    'models/Su-47_Berkut.obj',
-    // MTL resource URL
-    'models/Su-47_Berkut.mtl',
-    // Function when both resources are loaded
-    function ( object ) {
-      object.rotateX(-Math.PI / 2);
-      loaded_models += 1;
-      plane.mesh = object;
-      scene.add( object );
-      start();
-    },
-    // Function called when downloads progress
-    function ( xhr ) {
-      console.log( (xhr.loaded / xhr.total * 100) + '% loaded' );
-    },
-    // Function called when downloads error
-    function ( xhr ) {
-      console.log( 'An error happened' );
-    }
-  );
 }
 
 function start() {
-  if (game_is_started || loaded_models != MODELS_COUNT) return;
+  if (game_is_started || !plane.ready) return;
   game_is_started = true;
   move_interval = setInterval(move_objects, 10);
   render();
@@ -305,13 +163,14 @@ $(document).keyup(function (e) {
       plane.stop_move();
 });
 
-function Plane (camera) {
+function Plane (scene, camera) {
   this.camera = camera;
   this.speed_x = 0;
   this.reload_time = 0;
   this.bullets = [];
   this.rotation = 0;
   this.exhaust = new Exhaust();
+  this.initialize_mesh(scene);
 }
 
 Plane.prototype.move = function() {
@@ -367,6 +226,25 @@ Plane.prototype.update_position = function() {
   }
 }
 
+Plane.prototype.initialize_mesh = function(scene) {
+    var loader = new THREE.OBJMTLLoader();
+    var plane = this;
+    loader.load('models/Su-47_Berkut.obj', 'models/Su-47_Berkut.mtl',
+    function ( object ) {
+      object.rotateX(-Math.PI / 2);
+      plane.mesh = object;
+      scene.add( object );
+      plane.ready = true;
+    },
+    function ( xhr ) {
+      console.log( (xhr.loaded / xhr.total * 100) + '% loaded' );
+    },
+    function ( xhr ) {
+      console.log( 'An error happened' );
+    }
+  );
+}
+
 // Plane.prototype.update_bullets_position = function() {
 //   for (var i = 0; i < this.bullets.length; i++) {
 //     if (this.bullets[i].move() == false) {
@@ -378,7 +256,7 @@ Plane.prototype.update_position = function() {
 
 
 function Exhaust() {
-  this.meshes_array = this.generate_model(-0.8, -0.1, 9);
+  this.meshes_array = this.initialize_mesh(-0.8, -0.1, 9);
 }
 
 Exhaust.prototype.move = function(plane_pos, rotation) {
@@ -392,10 +270,12 @@ Exhaust.prototype.move = function(plane_pos, rotation) {
       this.meshes_array[i].position.y = plane_pos.y - 0.1;
     }
   }
+
+  this.particleGroup.tick( 0.026 );
 }
 
-Exhaust.prototype.generate_model = function (pos_x, pos_y, pos_z) {
-    particleGroup = new SPE.Group({
+Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
+    this.particleGroup = new SPE.Group({
         texture: THREE.ImageUtils.loadTexture('models/smokeparticle.png'),
         maxAge: 2
     });
@@ -422,18 +302,98 @@ Exhaust.prototype.generate_model = function (pos_x, pos_y, pos_z) {
         radius: 0.3
     });
 
-    particleGroup.mesh.rotateX(-Math.PI / 2);
-    particleGroup.mesh.position.x = pos_x;
-    particleGroup.mesh.position.y = pos_y;
-    particleGroup.mesh.position.z = pos_z;
-    particleGroup.addEmitter( emitter );
+    this.particleGroup.mesh.rotateX(-Math.PI / 2);
+    this.particleGroup.mesh.position.x = pos_x;
+    this.particleGroup.mesh.position.y = pos_y;
+    this.particleGroup.mesh.position.z = pos_z;
+    this.particleGroup.addEmitter( emitter );
 
-    scene.add( particleGroup.mesh );
+    scene.add( this.particleGroup.mesh );
 
-    particleGroup1 = particleGroup.mesh.clone();
+    var particleGroup1 = this.particleGroup.mesh.clone();
     particleGroup1.position.x = -pos_x;
     scene.add( particleGroup1 );
-    return [particleGroup.mesh, particleGroup1];
+    return [this.particleGroup.mesh, particleGroup1];
+}
+
+function Enviroment(scene, directional_light) {
+  this.water_array = [new Water(-500, scene, directional_light), new Water(-1500, scene, directional_light)];
+  this.kybox = new SkyBox(scene);
+}
+
+Enviroment.prototype.move = function() {
+  for (var index in this.water_array)
+    this.water_array[index].move();
+}
+
+function Water(pos_z, scene, directional_light) {
+  this.mesh = this.initialize_mesh(pos_z, scene, directional_light);
+}
+
+Water.prototype.move = function() {
+  this.mesh.position.z += WATER_SPEED;
+  if (this.mesh.position.z >= 500) this.mesh.position.z = -1500;
+  this.water_controller.material.uniforms.time.value += 1.0 / 60.0;
+  this.water_controller.render();
+}
+Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
+  var plane = new THREE.PlaneGeometry( 1000, 1200);
+
+
+  var water_normals = THREE.ImageUtils.loadTexture( 'models/ocean.jpg' );
+  water_normals.wrapS = water_normals.wrapT = THREE.RepeatWrapping;
+
+  this.water_controller = new THREE.Water(renderer, camera, scene, {
+      textureWidth: 512, 
+      textureHeight: 512,
+      waterNormals: water_normals,
+      alpha:  1.0,
+      sunDirection: directional_light.position.normalize(),
+      sunColor: 0xffffff,
+      waterColor: 0x001e0f,
+      distortionScale: 50.0,
+      side: THREE.DoubleSide
+  });
+
+  var water_mesh = new THREE.Mesh(plane, this.water_controller.material);
+
+  water_mesh.rotateZ(Math.PI / 2);
+  water_mesh.position.y = -15;
+  water_mesh.position.z = pos_z;
+
+  water_mesh.add(this.water_controller);
+  water_mesh.rotation.x = - Math.PI * 0.5;
+  scene.add(water_mesh);
+
+  return water_mesh;
+}
+
+function SkyBox(scene) {
+  this.initialize_mesh(scene);
+}
+
+SkyBox.prototype.initialize_mesh = function(scene) {
+  var materials = [
+    this.generate_texture( 'models/skybox/px.jpg' ), // right
+    this.generate_texture( 'models/skybox/nx.jpg' ), // left
+    this.generate_texture( 'models/skybox/py.jpg' ), // top
+    this.generate_texture( 'models/skybox/ny.jpg' ), // bottom
+    this.generate_texture( 'models/skybox/pz.jpg' ), // back
+    this.generate_texture( 'models/skybox/nz.jpg' )  // front
+  ];
+
+  var mesh = new THREE.Mesh( new THREE.BoxGeometry( 1500, 1500, 1500, 7, 7, 7 ), new THREE.MeshFaceMaterial( materials ) );
+  mesh.scale.x = - 1;
+  scene.add( mesh );
+}
+
+SkyBox.prototype.generate_texture = function(path) {
+  var texture = new THREE.Texture( container );
+  var material = new THREE.MeshBasicMaterial( { map: texture, overdraw: 0.5 } );
+  var image = new Image();
+  image.onload = function () { texture.image = this; texture.needsUpdate = true; };
+  image.src = path;
+  return material;
 }
 
 function sign(number) {
