@@ -27,11 +27,11 @@ var game_is_started = false;
 
 function render() {
   move_objects();
-  renderer.render(create_scene());
+  renderer.render(create_gaming_scene());
 }
 
 function render_with_text() {
-  renderer.render(create_scene_with_text());
+  renderer.render(create_start_scene());
 }
 
 function resize() {
@@ -75,16 +75,23 @@ function start() {
   enviroment_interval = setInterval(update_enviroment, 200);
 }
 
-function create_scene() {
+function create_gaming_scene() {
   var scene = new PIXI.Container();
   scene.addChild(enviroment.get_model());
   scene.addChild(iron_man.get_model());
   scene.addChild(plane.get_model());
+  if (iron_man.boom_duration > 0) {
+    var text_style = {font: "bold 35px Snippet", fill: "white", dropShadow: true };
+    var target_text = new PIXI.Text('IRON MAN IS DESTROYED', text_style);
+    target_text.position.x = WIDTH / 2 - target_text.width / 2;
+    target_text.position.y = HEIGHT / 2 - target_text.height;
+    scene.addChild(target_text)
+  }
   return scene;
 };
 
-function create_scene_with_text() {
-  var scene = create_scene();
+function create_start_scene() {
+  var scene = create_gaming_scene();
   var text_style = {font: "bold 35px Snippet", fill: "white", dropShadow: true };
   var target_text = new PIXI.Text('DESTROY THE IRON MAN', text_style);
   var press_text = new PIXI.Text('press [enter] to start', text_style);
