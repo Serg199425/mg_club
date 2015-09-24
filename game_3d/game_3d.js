@@ -47,18 +47,17 @@ function onWindowResize() {
 
 function initialize_renderer() {
 
-  container = document.getElementById( 'container' );
+  camera = new THREE.PerspectiveCamera( 10, window.innerWidth / window.innerHeight, 100, 1000000 );
+  camera.position.set( 0, 45, 160 );
+  camera.rotateX(-Math.PI / 14);
+
+
+  scene = new THREE.Scene();
 
   renderer = new THREE.WebGLRenderer();
-  renderer.setClearColor( 0xaaccff );
   renderer.setPixelRatio( window.devicePixelRatio );
-  renderer.setSize( WIDTH, HEIGHT );
-
-  container.innerHTML = "";
-
-  container.appendChild( renderer.domElement );
-
-  window.addEventListener( 'resize', onWindowResize, false );
+  renderer.setSize( window.innerWidth - 25, window.innerHeight - 25 );
+  document.body.appendChild( renderer.domElement );
 
   stats = new Stats();
   stats.setMode( 0 );
@@ -66,20 +65,9 @@ function initialize_renderer() {
   stats.domElement.style.left = '0px';
   stats.domElement.style.top = '0px';
   document.body.appendChild( stats.domElement );
-
-  renderer.autoClear = false;
 }
 
 function initialize_objects() {
-  clock = new THREE.Clock();
-
-  camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 20000 );
-  camera.position.z = 40;
-  camera.position.y = 10;
-  camera.rotateX(-Math.PI / 40);
-
-  scene = new THREE.Scene();
-
   var light = new THREE.AmbientLight( 0xffffff ); // soft white light
   scene.add( light );
 
@@ -91,10 +79,6 @@ function initialize_objects() {
   enviroment = new Enviroment(scene, directional_light);
 
   load_models();
-  testing();
-}
-
-function testing() {
 }
 
 function load_models() {
@@ -111,7 +95,7 @@ function load_models() {
       mesh = object;
       mesh.rotateX(-Math.PI / 2);
       mesh.rotateY(Math.PI);
-      mesh.position.z = -60;
+      mesh.position.z = -130;
       mesh.scale.x = 2;
       mesh.scale.y = 2;
       mesh.scale.z = 2;
@@ -318,7 +302,7 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
 
 function Enviroment(scene, directional_light) {
   this.water_array = [new Water(-500, scene, directional_light), new Water(-1500, scene, directional_light)];
-  this.kybox = new SkyBox(scene);
+  this.skybox = new SkyBox(scene);
 }
 
 Enviroment.prototype.move = function() {
@@ -369,22 +353,39 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
 }
 
 function SkyBox(scene) {
-  this.initialize_mesh(scene);
+  this.mesh = this.initialize_mesh(scene);
 }
 
 SkyBox.prototype.initialize_mesh = function(scene) {
-  var materials = [
-    this.generate_texture( 'models/skybox/px.jpg' ), // right
-    this.generate_texture( 'models/skybox/nx.jpg' ), // left
-    this.generate_texture( 'models/skybox/py.jpg' ), // top
-    this.generate_texture( 'models/skybox/ny.jpg' ), // bottom
-    this.generate_texture( 'models/skybox/pz.jpg' ), // back
-    this.generate_texture( 'models/skybox/nz.jpg' )  // front
-  ];
+  sky = new THREE.Sky();
+  scene.add( sky.mesh );
 
-  var mesh = new THREE.Mesh( new THREE.BoxGeometry( 1500, 1500, 1500, 7, 7, 7 ), new THREE.MeshFaceMaterial( materials ) );
-  mesh.scale.x = - 1;
-  scene.add( mesh );
+  sunSphere = new THREE.Mesh(new THREE.BufferGeometry().fromGeometry( new THREE.SphereGeometry( 20000, 16, 8 ) ),
+    new THREE.MeshBasicMaterial( { color: 0xffffff } )
+  );
+  sunSphere.position.y = - 700000;
+  sunSphere.visible = false;
+  scene.add( sunSphere );
+
+  var distance = 400000;
+  var uniforms = sky.uniforms;
+  uniforms.turbidity.value = 10;
+  uniforms.reileigh.value = 2;
+  uniforms.luminance.value = 1;
+  uniforms.mieCoefficient.value = 0.005;
+  uniforms.mieDirectionalG.value = 0.8;
+
+
+  var theta = Math.PI * ( 0.49 - 0.5 );
+  var phi = 2 * Math.PI * ( 0.25 - 0.5 );
+
+  sunSphere.position.x = distance * Math.cos( phi );
+  sunSphere.position.y = distance * Math.sin( phi ) * Math.sin( theta );
+  sunSphere.position.z = distance * Math.sin( phi ) * Math.cos( theta );
+
+  sunSphere.visible = false;
+
+  sky.uniforms.sunPosition.value.copy( sunSphere.position );
 }
 
 SkyBox.prototype.generate_texture = function(path) {
