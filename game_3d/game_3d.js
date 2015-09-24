@@ -353,14 +353,14 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
 }
 
 function SkyBox(scene) {
-  this.mesh = this.initialize_mesh(scene);
+  this.initialize_mesh(scene);
 }
 
 SkyBox.prototype.initialize_mesh = function(scene) {
-  sky = new THREE.Sky();
+  var sky = new THREE.Sky();
   scene.add( sky.mesh );
 
-  sunSphere = new THREE.Mesh(new THREE.BufferGeometry().fromGeometry( new THREE.SphereGeometry( 20000, 16, 8 ) ),
+  var sunSphere = new THREE.Mesh(new THREE.BufferGeometry().fromGeometry( new THREE.SphereGeometry( 20000, 16, 8 ) ),
     new THREE.MeshBasicMaterial( { color: 0xffffff } )
   );
   sunSphere.position.y = - 700000;
@@ -387,16 +387,6 @@ SkyBox.prototype.initialize_mesh = function(scene) {
 
   sky.uniforms.sunPosition.value.copy( sunSphere.position );
 }
-
-SkyBox.prototype.generate_texture = function(path) {
-  var texture = new THREE.Texture( container );
-  var material = new THREE.MeshBasicMaterial( { map: texture, overdraw: 0.5 } );
-  var image = new Image();
-  image.onload = function () { texture.image = this; texture.needsUpdate = true; };
-  image.src = path;
-  return material;
-}
-
 function sign(number) {
   return number ? number < 0 ? -1 : 1 : 0;
 }
