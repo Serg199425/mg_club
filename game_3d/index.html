@@ -10,7 +10,7 @@
 
     <div id="container"></div>
 
-    <script src="three.js"></script>
+    <script src="THREE-r71.min.js"></script>
     <script src="Stats.js"></script>
     <script src="FirstPersonControls.js"></script>
     <script src="OBJLoader.js"></script>
@@ -18,9 +18,12 @@
     <script src="OBJMTLLoader.js"></script>
     <script src="ColladaLoader.js"></script>
     <script src="jquery.min.js"></script>
-    <script src="game_3d.js"></script>>
+    <script src="game_3d.js"></script>
+    <script src="ShaderParticleUtils.js"></script>
+    <script src="ShaderParticleGroup.js"></script>
+    <script src="ShaderParticleEmitter.js"></script>
 
-    <script>
+    // <script>
 
     //   var container;
 
@@ -44,10 +47,10 @@
     //     camera.position.z = 75;
     //     camera.position.y = 20;
 
-    //     controls = new THREE.FirstPersonControls( camera );
+    //     // controls = new THREE.FirstPersonControls( camera );
 
-    //     controls.movementSpeed = 500;
-    //     controls.lookSpeed = 0.1;
+    //     // controls.movementSpeed = 500;
+    //     // controls.lookSpeed = 0.1;
 
     //     scene = new THREE.Scene();
 
@@ -178,7 +181,7 @@
 
     //     camera.aspect = window.innerWidth / window.innerHeight;
     //     camera.updateProjectionMatrix();
-    //     controls.handleResize();
+    //     // controls.handleResize();
 
     //     renderer.setSize( window.innerWidth, window.innerHeight );
 
@@ -198,8 +201,8 @@
 
     //   function render() {
 
-    //     var delta = clock.getDelta(),
-    //       time = clock.getElapsedTime() * 10;
+    //     // var delta = clock.getDelta(),
+    //     //   time = clock.getElapsedTime() * 10;
 
     //     // var nx, ny, nz;
 

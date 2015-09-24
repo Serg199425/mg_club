@@ -30,6 +30,7 @@ var MODELS_COUNT = 2;
 
 function render() {
   requestAnimationFrame( render );
+  particleGroup.tick( 0.026 );
   renderer.render( scene, camera );
   stats.update();
 }
@@ -39,12 +40,11 @@ function render_with_text() {
 }
 
 function onWindowResize() {
-
-  camera.aspect = window.innerWidth - 20 / window.innerHeight - 20;
-  camera.updateProjectionMatrix();
-  controls.handleResize();
-
-  renderer.setSize( window.innerWidth, window.innerHeight );
+    WIDTH = window.innerWidth - 20;
+    HEIGHT = window.innerHeight - 20;
+    camera.aspect = WIDTH / HEIGHT;
+    camera.updateProjectionMatrix();
+    renderer.setSize( WIDTH, HEIGHT );
 
 }
 
@@ -64,9 +64,7 @@ function initialize_renderer() {
   window.addEventListener( 'resize', onWindowResize, false );
 
   stats = new Stats();
-  stats.setMode( 0 ); // 0: fps, 1: ms, 2: mb
-
-  // align top-left
+  stats.setMode( 0 );
   stats.domElement.style.position = 'absolute';
   stats.domElement.style.left = '0px';
   stats.domElement.style.top = '0px';
@@ -76,7 +74,7 @@ function initialize_objects() {
 
   camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 20000 );
   camera.position.z = 75;
-  camera.position.y = 20;
+  camera.position.y = 10;
 
   scene = new THREE.Scene();
 
@@ -107,10 +105,10 @@ function initialize_objects() {
   dirLight.shadowCameraVisible = true;
   scene.add( dirLight );
 
+  clock = new THREE.Clock();
   controls = new THREE.FirstPersonControls( camera );
 
   plane = new Plane(camera);
-
   load_models();
 }
 
@@ -159,22 +157,6 @@ function load_models() {
       console.log( 'An error happened' );
     }
   );
-
-
-  // var loader = new THREE.ColladaLoader();
-
-  // loader.load(
-  //   // resource URL
-  //   'models/Ironman.dae',
-  //   // Function when resource is loaded
-  //   function ( collada ) {
-  //     scene.add( collada.scene );
-  //   },
-  //   // Function called when download progresses
-  //   function ( xhr ) {
-  //     console.log( (xhr.loaded / xhr.total * 100) + '% loaded' );
-  //   }
-  // );
 }
 
 function start() {
@@ -225,6 +207,7 @@ function Plane (camera) {
   this.reload_time = 0;
   this.bullets = [];
   this.rotation = 0;
+  this.exhaust = new Exhaust();
 }
 
 Plane.prototype.move = function() {
@@ -264,7 +247,8 @@ Plane.prototype.update_position = function() {
     this.speed_x = 0;
   }
 
-  this.camera.position.x += this.speed_x / 2;
+  sign(direction) != sign(this.rotation) ? this.camera.position.x += this.speed_x / 10 : this.camera.position.x += this.speed_x / 2;
+  this.exhaust.move(this.mesh.position, this.rotation);
 
   if (this.speed_x != 0) {
     if (Math.abs(this.rotation * PLANE_ANGLE_STEP) <= PLANE_MAX_ANGLE || sign(direction) != sign(this.rotation)) {
@@ -287,6 +271,66 @@ Plane.prototype.update_position = function() {
 //     }
 //   }
 // }
+
+
+function Exhaust() {
+  this.meshes_array = this.generate_model(-0.8, -0.1, 9);
+}
+
+Exhaust.prototype.move = function(plane_pos, rotation) {
+  for (var i = 0; i < this.meshes_array.length; i++) {
+    this.meshes_array[i].position.z = plane_pos.z + 9;
+    i == 0 ? this.meshes_array[i].position.x = plane_pos.x - 0.8 : this.meshes_array[i].position.x = plane_pos.x + 0.8;
+
+    if (rotation != 0) {
+      i == 0 ? this.meshes_array[i].position.y = plane_pos.y + 0.05 * rotation : this.meshes_array[i].position.y = plane_pos.y - 0.05 * rotation;
+    } else {
+      this.meshes_array[i].position.y = plane_pos.y - 0.1;
+    }
+  }
+}
+
+Exhaust.prototype.generate_model = function (pos_x, pos_y, pos_z) {
+    particleGroup = new SPE.Group({
+        texture: THREE.ImageUtils.loadTexture('models/smokeparticle.png'),
+        maxAge: 2
+    });
+
+    emitter = new SPE.Emitter({
+        type : 'sphere',
+        position: new THREE.Vector3(0, 0, 0),
+        positionSpread: new THREE.Vector3( 0, 0, 0 ),
+
+        acceleration: new THREE.Vector3(0, -170, 0),
+        accelerationSpread: new THREE.Vector3( 5, 0, 5 ),
+
+        velocity: new THREE.Vector3(0, 5, 0),
+        velocitySpread: new THREE.Vector3(10, 7.5, 10),
+
+        colorStart: new THREE.Color(0xff5a00),
+        colorEnd: new THREE.Color('gray'),
+
+        sizeStart: 1,
+        sizeEnd: 8,
+
+        particleCount: 5000,
+        alive: 1,
+        radius: 0.3
+    });
+
+    particleGroup.mesh.rotateX(-Math.PI / 2);
+    particleGroup.mesh.position.x = pos_x;
+    particleGroup.mesh.position.y = pos_y;
+    particleGroup.mesh.position.z = pos_z;
+    particleGroup.addEmitter( emitter );
+
+    scene.add( particleGroup.mesh );
+
+    particleGroup1 = particleGroup.mesh.clone();
+    particleGroup1.position.x = -pos_x;
+    scene.add( particleGroup1 );
+    return [particleGroup.mesh, particleGroup1];
+}
 
 function sign(number) {
   return number ? number < 0 ? -1 : 1 : 0;
