@@ -30,9 +30,14 @@ var MODELS_COUNT = 2;
 
 function render() {
   requestAnimationFrame( render );
+  var delta = clock.getDelta(),
+  time = clock.getElapsedTime() * 10;
+  change_cylinder(time);
   particleGroup.tick( 0.026 );
   renderer.render( scene, camera );
   stats.update();
+  water.material.uniforms.time.value += 1.0 / 60.0;
+  water.render();
 }
 
 function render_with_text() {
@@ -68,13 +73,20 @@ function initialize_renderer() {
   stats.domElement.style.position = 'absolute';
   stats.domElement.style.left = '0px';
   stats.domElement.style.top = '0px';
+  document.body.appendChild( stats.domElement );
+
+  renderer.autoClear = false;
 }
 
 function initialize_objects() {
+  clock = new THREE.Clock();
 
   camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 20000 );
-  camera.position.z = 75;
+  // camera.position.z = 40;
+  // camera.position.y = 10;
+  camera.position.z = 40;
   camera.position.y = 10;
+  camera.rotateX(-Math.PI / 40);
 
   scene = new THREE.Scene();
 
@@ -105,11 +117,102 @@ function initialize_objects() {
   dirLight.shadowCameraVisible = true;
   scene.add( dirLight );
 
+  var light = new THREE.AmbientLight( 0x404040 ); // soft white light
+  scene.add( light );
+
   clock = new THREE.Clock();
   controls = new THREE.FirstPersonControls( camera );
 
   plane = new Plane(camera);
+
+    var geometry = new THREE.SphereGeometry( 150, 150, 50 );
+  var material = new THREE.MeshPhongMaterial( { color: 0x00AAfF } );
+  var mesh = new THREE.Mesh( geometry, material );
+  scene.add(mesh);
+  mesh.position.y = 20;
+
+  load_enviroment();
   load_models();
+  testing();
+}
+
+function change_cylinder(time) {
+  aMeshMirror.rotation.x += 0.001;
+}
+
+function load_enviroment() {
+      var materials = [
+
+      loadTexture( 'models/skybox/px.jpg' ), // right
+      loadTexture( 'models/skybox/nx.jpg' ), // left
+      loadTexture( 'models/skybox/py.jpg' ), // top
+      loadTexture( 'models/skybox/ny.jpg' ), // bottom
+      loadTexture( 'models/skybox/pz.jpg' ), // back
+      loadTexture( 'models/skybox/nz.jpg' )  // front
+
+    ];
+
+    mesh = new THREE.Mesh( new THREE.BoxGeometry( 1500, 1500, 1500, 7, 7, 7 ), new THREE.MeshFaceMaterial( materials ) );
+    mesh.scale.x = - 1;
+    scene.add( mesh );
+}
+
+function loadTexture( path ) {
+
+        var texture = new THREE.Texture( container );
+        var material = new THREE.MeshBasicMaterial( { map: texture, overdraw: 0.5 } );
+
+        var image = new Image();
+        image.onload = function () {
+
+          texture.image = this;
+          texture.needsUpdate = true;
+
+        };
+        image.src = path;
+
+        return material;
+
+      }
+
+function testing() {
+  geometry = new THREE.CylinderGeometry( 5000, 5000, 1500, 1500);
+
+
+  var waterNormals = THREE.ImageUtils.loadTexture( 'models/ocean.jpg' );
+  waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
+
+  var directionalLight = new THREE.DirectionalLight(0xffff55, 1);
+    directionalLight.position.set(-600, 300, 600);
+    scene.add(directionalLight);
+
+  water = new THREE.Water(renderer, camera, scene, {
+      textureWidth: 512, 
+      textureHeight: 512,
+      waterNormals: waterNormals,
+      alpha:  1.0,
+      sunDirection: directionalLight.position.normalize(),
+      sunColor: 0xffffff,
+      waterColor: 0x001e0f,
+      distortionScale: 50.0
+  });
+
+  aMeshMirror = new THREE.Mesh(geometry, water.material);
+
+  aMeshMirror.rotateZ(Math.PI / 2);
+  aMeshMirror.position.y = -5000;
+  aMeshMirror.position.z = -700;
+
+  aMeshMirror.add(water);
+  aMeshMirror.rotation.x = - Math.PI * 0.5;
+  scene.add(aMeshMirror);
+
+  // var material = new THREE.MeshPhongMaterial( { map: waterNormals, transparent: true, opacity: 0.4, emissive: 0x111111, envMap: camera.renderTarget } );
+  // cylinder = new THREE.Mesh( geometry, material );
+  // cylinder.rotateZ(Math.PI / 2);
+  // cylinder.position.y = -5000;
+  // cylinder.position.z = -700;
+  // scene.add( cylinder );
 }
 
 function load_models() {
@@ -147,6 +250,7 @@ function load_models() {
       loaded_models += 1;
       plane.mesh = object;
       scene.add( object );
+      start();
     },
     // Function called when downloads progress
     function ( xhr ) {
