@@ -27,7 +27,7 @@ var IRON_MAN_RADAR_RADIUS = 200;
 var RELOAD_TIME = 10;
 var game_is_started = false;
 var MODELS_COUNT = 2;
-var WATER_SPEED = 10;
+var WATER_SPEED = 5;
 
 function render() {
   requestAnimationFrame( render );
@@ -37,8 +37,8 @@ function render() {
 }
 
 function onWindowResize() {
-    WIDTH = window.innerWidth - 20;
-    HEIGHT = window.innerHeight - 20;
+    WIDTH = window.innerWidth - 25;
+    HEIGHT = window.innerHeight - 25;
     camera.aspect = WIDTH / HEIGHT;
     camera.updateProjectionMatrix();
     renderer.setSize( WIDTH, HEIGHT );
@@ -58,6 +58,7 @@ function initialize_renderer() {
   renderer.setPixelRatio( window.devicePixelRatio );
   renderer.setSize( window.innerWidth - 25, window.innerHeight - 25 );
   document.body.appendChild( renderer.domElement );
+  window.addEventListener( 'resize', onWindowResize, false );
 
   stats = new Stats();
   stats.setMode( 0 );
@@ -76,33 +77,8 @@ function initialize_objects() {
   scene.add(directional_light);
 
   plane = new Plane(scene, camera);
+  iron_man = new IronMan(scene);
   enviroment = new Enviroment(scene, directional_light);
-
-  load_models();
-}
-
-function load_models() {
-  var loader = new THREE.OBJMTLLoader();
-
-  // load an obj / mtl resource pair
-  loader.load(
-    // OBJ resource URL
-    'models/Mark_42.obj',
-    // MTL resource URL
-    'models/Mark_42.mtl',
-    // Function when both resources are loaded
-    function ( object ) {
-      mesh = object;
-      mesh.rotateX(-Math.PI / 2);
-      mesh.rotateY(Math.PI);
-      mesh.position.z = -130;
-      mesh.scale.x = 2;
-      mesh.scale.y = 2;
-      mesh.scale.z = 2;
-      scene.add( object );
-      loaded_models += 1;
-    }
-  );
 }
 
 function start() {
@@ -249,19 +225,22 @@ Exhaust.prototype.move = function(plane_pos, rotation) {
     i == 0 ? this.meshes_array[i].position.x = plane_pos.x - 0.8 : this.meshes_array[i].position.x = plane_pos.x + 0.8;
 
     if (rotation != 0) {
-      i == 0 ? this.meshes_array[i].position.y = plane_pos.y + 0.05 * rotation : this.meshes_array[i].position.y = plane_pos.y - 0.05 * rotation;
+      i == 0 ? this.meshes_array[i].position.y = plane_pos.y + 0.037 * rotation : this.meshes_array[i].position.y = plane_pos.y - 0.037 * rotation;
     } else {
       this.meshes_array[i].position.y = plane_pos.y - 0.1;
     }
   }
 
-  this.particleGroup.tick( 0.026 );
+  this.particleGroup.tick();
 }
 
 Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
     this.particleGroup = new SPE.Group({
         texture: THREE.ImageUtils.loadTexture('models/smokeparticle.png'),
-        maxAge: 2
+        maxAge: 2,
+        depthTest: true,
+        fixedTimeStep: 0.016, 
+        blending: THREE.AdditiveBlending,
     });
 
     emitter = new SPE.Emitter({
@@ -278,18 +257,16 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
         colorStart: new THREE.Color(0xff5a00),
         colorEnd: new THREE.Color('gray'),
 
-        sizeStart: 1,
-        sizeEnd: 8,
+        sizeStart: 10,
+        sizeEnd: 10,
 
-        particleCount: 5000,
-        alive: 1,
-        radius: 0.3
+        particleCount: 15000,
+        alive: 0.5,
+        radius: 0.2,
     });
 
     this.particleGroup.mesh.rotateX(-Math.PI / 2);
-    this.particleGroup.mesh.position.x = pos_x;
-    this.particleGroup.mesh.position.y = pos_y;
-    this.particleGroup.mesh.position.z = pos_z;
+    this.particleGroup.mesh.position.set(pos_x, pos_y, pos_z);
     this.particleGroup.addEmitter( emitter );
 
     scene.add( this.particleGroup.mesh );
@@ -299,6 +276,30 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
     scene.add( particleGroup1 );
     return [this.particleGroup.mesh, particleGroup1];
 }
+
+
+function IronMan (scene) {
+  this.speed_x = IRON_MAN_SPEED_X;
+  this.initialize_mesh(scene);
+}
+
+IronMan.prototype.initialize_mesh = function(scene) {
+  var loader = new THREE.OBJMTLLoader();
+  var iron_man = this;
+
+  loader.load('models/Mark_42.obj', 'models/Mark_42.mtl',
+    function ( object ) {
+      iron_man = object;
+      iron_man.rotateX(-Math.PI / 2);
+      iron_man.rotateY(Math.PI);
+      iron_man.position.z = -130;
+      iron_man.scale.set(2,2,2);
+      scene.add( iron_man );
+      this.ready = true;
+    }
+  );
+}
+
 
 function Enviroment(scene, directional_light) {
   this.water_array = [new Water(-500, scene, directional_light), new Water(-1500, scene, directional_light)];
@@ -315,13 +316,13 @@ function Water(pos_z, scene, directional_light) {
 }
 
 Water.prototype.move = function() {
-  this.mesh.position.z += WATER_SPEED;
-  if (this.mesh.position.z >= 500) this.mesh.position.z = -1500;
   this.water_controller.material.uniforms.time.value += 1.0 / 60.0;
   this.water_controller.render();
+  if (this.mesh.position.z == 500) this.mesh.position.z = -1500;
+  this.mesh.position.z += WATER_SPEED;
 }
 Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
-  var plane = new THREE.PlaneGeometry( 1000, 1200);
+  var plane = new THREE.BufferGeometry().fromGeometry(new THREE.PlaneGeometry( 1000, 1200));
 
 
   var water_normals = THREE.ImageUtils.loadTexture( 'models/ocean.jpg' );
@@ -335,7 +336,7 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
       sunDirection: directional_light.position.normalize(),
       sunColor: 0xffffff,
       waterColor: 0x001e0f,
-      distortionScale: 50.0,
+      distortionScale: 80.0,
       side: THREE.DoubleSide
   });
 
