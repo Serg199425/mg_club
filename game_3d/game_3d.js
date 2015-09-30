@@ -28,6 +28,8 @@ var RELOAD_TIME = 10;
 var game_is_started = false;
 var MODELS_COUNT = 2;
 var WATER_SPEED = 5;
+var BULLET_SPEED_Z = 8;
+var BULLET_OFFSET = 2;
 
 function render() {
   requestAnimationFrame( render );
@@ -48,9 +50,13 @@ function onWindowResize() {
 function initialize_renderer() {
 
   camera = new THREE.PerspectiveCamera( 10, window.innerWidth / window.innerHeight, 100, 1000000 );
-  camera.position.set( 0, 45, 160 );
+  camera.position.set( 0, 45, 155 );
   camera.rotateX(-Math.PI / 14);
 
+
+  // camera = new THREE.PerspectiveCamera( 10, window.innerWidth / window.innerHeight, 100, 1000000 );
+  // camera.position.set( 0, 525, -30 );
+  // camera.rotateX(-Math.PI / 2);
 
   scene = new THREE.Scene();
 
@@ -112,8 +118,8 @@ $(document).keydown(function (e) {
       if (keys[39] && !keys[37] || keys[37] && keys[39] && plane.speed_x < 0)
         plane.start_move(1);
     }
-    // if (keys[32])
-    //   plane.shoot();
+    if (keys[32])
+      plane.shoot();
     previous_keys = keys;
 });
 
@@ -125,6 +131,7 @@ $(document).keyup(function (e) {
 
 function Plane (scene, camera) {
   this.camera = camera;
+  this.scene = scene;
   this.speed_x = 0;
   this.reload_time = 0;
   this.bullets = [];
@@ -134,14 +141,14 @@ function Plane (scene, camera) {
 }
 
 Plane.prototype.move = function() {
-  // this.reload();
+  this.reload();
   this.update_position();
-  // this.update_bullets_position();
+  this.update_bullets_position();
 }
 
-// Plane.prototype.reload = function() {
-//   if (this.reload_time > 0) this.reload_time--;
-// }
+Plane.prototype.reload = function() {
+  if (this.reload_time > 0) this.reload_time--;
+}
 
 Plane.prototype.start_move = function(direction) {
   this.speed_x = direction * MAX_SPEED_X;
@@ -151,12 +158,12 @@ Plane.prototype.stop_move = function() {
   this.speed_x = 0;
 }
 
-// Plane.prototype.shoot = function() {
-//   if (this.reload_time > 0) return;
-//   this.reload_time = RELOAD_TIME;
-//   this.bullets.push(new Bullet(this.pos_x + 30, this.pos_y + 120));
-//   this.bullets.push(new Bullet(this.pos_x - 30, this.pos_y + 120));
-// }
+Plane.prototype.shoot = function() {
+  if (this.reload_time > 0) return;
+  this.reload_time = RELOAD_TIME;
+  this.bullets.push(new Bullet(this.scene, this.mesh.position, 1));
+  this.bullets.push(new Bullet(this.scene, this.mesh.position, -1));
+}
 
 Plane.prototype.update_position = function() {
   var direction = sign(this.speed_x);
@@ -205,29 +212,29 @@ Plane.prototype.initialize_mesh = function(scene) {
   );
 }
 
-// Plane.prototype.update_bullets_position = function() {
-//   for (var i = 0; i < this.bullets.length; i++) {
-//     if (this.bullets[i].move() == false) {
-//       this.bullets.splice(i,1);
-//       i--;
-//     }
-//   }
-// }
+Plane.prototype.update_bullets_position = function() {
+  for (var i = 0; i < this.bullets.length; i++) {
+    if (this.bullets[i].move() == false) {
+      this.bullets.splice(i,1);
+      i--;
+    }
+  }
+}
 
 
 function Exhaust() {
   this.meshes_array = this.initialize_mesh(-0.8, -0.1, 9);
 }
 
-Exhaust.prototype.move = function(plane_pos, rotation) {
+Exhaust.prototype.move = function(parent_position, rotation) {
   for (var i = 0; i < this.meshes_array.length; i++) {
-    this.meshes_array[i].position.z = plane_pos.z + 9;
-    i == 0 ? this.meshes_array[i].position.x = plane_pos.x - 0.8 : this.meshes_array[i].position.x = plane_pos.x + 0.8;
+    this.meshes_array[i].position.z = parent_position.z + 9;
+    i == 0 ? this.meshes_array[i].position.x = parent_position.x - 0.8 : this.meshes_array[i].position.x = parent_position.x + 0.8;
 
     if (rotation != 0) {
-      i == 0 ? this.meshes_array[i].position.y = plane_pos.y + 0.037 * rotation : this.meshes_array[i].position.y = plane_pos.y - 0.037 * rotation;
+      i == 0 ? this.meshes_array[i].position.y = parent_position.y + 0.037 * rotation : this.meshes_array[i].position.y = parent_position.y - 0.037 * rotation;
     } else {
-      this.meshes_array[i].position.y = plane_pos.y - 0.1;
+      this.meshes_array[i].position.y = parent_position.y - 0.1;
     }
   }
 
@@ -260,7 +267,7 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
         sizeStart: 10,
         sizeEnd: 10,
 
-        particleCount: 15000,
+        particleCount: 1000,
         alive: 0.5,
         radius: 0.2,
     });
@@ -293,7 +300,7 @@ IronMan.prototype.initialize_mesh = function(scene) {
       iron_man.rotateX(-Math.PI / 2);
       iron_man.rotateY(Math.PI);
       iron_man.position.z = -130;
-      iron_man.scale.set(2,2,2);
+      iron_man.scale.set(2.5,2.5,2.5);
       scene.add( iron_man );
       this.ready = true;
     }
@@ -332,10 +339,10 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
       textureWidth: 512, 
       textureHeight: 512,
       waterNormals: water_normals,
-      alpha:  1.0,
+      alpha:  0.2,
       sunDirection: directional_light.position.normalize(),
       sunColor: 0xffffff,
-      waterColor: 0x001e0f,
+      waterColor: 0x001FFf,
       distortionScale: 80.0,
       side: THREE.DoubleSide
   });
@@ -388,6 +395,31 @@ SkyBox.prototype.initialize_mesh = function(scene) {
 
   sky.uniforms.sunPosition.value.copy( sunSphere.position );
 }
+
+function Bullet(scene, pos_vector, side) {
+  this.initialize_mesh(scene, pos_vector, side);
+  this.exhaust = new Exhaust();
+  this.scene = scene;
+}
+
+Bullet.prototype.initialize_mesh = function(scene, pos_vector, side) {
+  this.mesh = new THREE.Mesh(new THREE.BoxGeometry( 0.1, 1, 1 ),
+    new THREE.MeshBasicMaterial( { color: 0xFFFF00 })
+  );
+
+  this.mesh.position.set(pos_vector.x + side * BULLET_OFFSET, 0, 0)
+  scene.add( this.mesh );
+}
+
+Bullet.prototype.move = function() {
+  this.mesh.position.z -= BULLET_SPEED_Z;
+  if (this.mesh.position.z < -170) {
+    this.scene.remove(this.mesh)
+    return false;
+  }
+  return true;
+}
+
 function sign(number) {
   return number ? number < 0 ? -1 : 1 : 0;
 }
