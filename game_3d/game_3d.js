@@ -7,38 +7,37 @@ $(document).on('ready', function() {
 
 var WIDTH = window.innerWidth - 20;
 var HEIGHT = window.innerHeight - 20;
-var LEFT_BORDER = -40;
-var RIGHT_BORDER = 40;
+var BORDER_X = 40;
 var FRONT_BORDER_Z = -170;
-var DOWN_BORDER = window.innerHeight;
-var PLANE_MAX_ANGLE = 0.5;
+var PLANE_MAX_ROTATIONS = 10;
 var PLANE_ANGLE_STEP = 0.05;
-var IRON_MAN_MAX_ANGLE = 1.0;
-var IRON_MAN_ANGLE_STEP = 0.2;
 var MAX_SPEED_X = 1;
+var MAX_SPEED_Y = 1;
 var SPEED_UP_STEP = 5;
 var SPEED_DOWN_STEP = 1;
 var BULLET_SPEED_Y = 10;
+var BULLET_SPEED_Z = 8;
+var BULLET_OFFSET = 2;
+var RELOAD_TIME = 10;
+
+var IRON_MAN_MAX_ROTATIONS = 8;
+var IRON_MAN_ANGLE_STEP = 0.1;
 var BOOM_SPEED = 20;
 var BOOM_DURATION_CIRCLES = 100;
+var IRON_MAN_SPEED_X = 0.5;
+var IRON_MAN_RADAR_RADIUS = 20;
+
 var CLOUD_SPEED_X = 1;
 var CLOUD_SPEED_Y = 20;
 var CLOUD_BOOM_SPEED = 40;
-var IRON_MAN_SPEED_X = 1;
-var IRON_MAN_RADAR_RADIUS = 20;
-var RELOAD_TIME = 10;
+
 var game_is_started = false;
 var MODELS_COUNT = 2;
 var WATER_SPEED = 5;
-var BULLET_SPEED_Z = 8;
-var BULLET_OFFSET = 2;
 
 function render() {
   requestAnimationFrame( render );
   renderer.render( scene, camera );
-  iron_man.check_collision(plane.bullets);
-  iron_man.move(plane.bullets);
-  enviroment.move();
   stats.update();
 }
 
@@ -100,6 +99,9 @@ function start() {
 
 function move_objects() {
   plane.move();
+  iron_man.check_collision(plane.bullets);
+  iron_man.move(plane.bullets);
+  enviroment.move();
 }
 
 var keys = {};
@@ -116,12 +118,28 @@ $(document).keydown(function (e) {
     if (game_is_started == false)
       return;
 
+    var direction_x = 0;
+    var direction_y = 0; 
+
     if (keys[37] && !keys[39] || keys[37] && keys[39] && plane.speed_x > 0) {
-      plane.start_move(-1);
+      direction_x = -1;
     } else {
       if (keys[39] && !keys[37] || keys[37] && keys[39] && plane.speed_x < 0)
-        plane.start_move(1);
+        direction_x = 1;
+      else
+        direction_x = 0;
     }
+
+    if (keys[38] && !keys[40] || keys[38] && keys[40] && plane.speed_y > 0) {
+      direction_y = -1;
+    } else {
+      if (keys[38] && !keys[40] || keys[38] && keys[40] && plane.speed_y < 0)
+        direction_y = 1;
+      else
+        direction_y = 0; 
+    }
+
+    plane.start_move(direction_x, direction_y);
     if (keys[32])
       plane.is_shooting = true;
     previous_keys = keys;
@@ -129,7 +147,7 @@ $(document).keydown(function (e) {
 
 $(document).keyup(function (e) {
     delete keys[e.which];
-    if (!keys[37] && !keys[39])
+    if (!keys[37] && !keys[38] && !keys[39] && !keys[40])
       plane.stop_move();
     if (!keys[32])
       plane.is_shooting = false;
@@ -139,12 +157,15 @@ function Plane (scene, camera) {
   this.camera = camera;
   this.scene = scene;
   this.speed_x = 0;
+  this.speed_y = 0;
   this.reload_time = 0;
   this.bullets = [];
-  this.rotation = 0;
+  this.rotations = 0;
   this.exhaust = new Exhaust();
   this.initialize_mesh(scene);
   this.is_shooting = false;
+  this.direction_x = 0;
+  this.direction_y = 0;
 }
 
 Plane.prototype.move = function() {
@@ -158,12 +179,14 @@ Plane.prototype.reload = function() {
   if (this.reload_time > 0) this.reload_time--;
 }
 
-Plane.prototype.start_move = function(direction) {
-  this.speed_x = direction * MAX_SPEED_X;
+Plane.prototype.start_move = function(direction_x, direction_y) {
+  this.direction_x = direction_x; 
+  this.direction_y = direction_y;
 }
 
 Plane.prototype.stop_move = function() {
-  this.speed_x = 0;
+  this.direction_x = 0;
+  this.direction_y = 0;
 }
 
 Plane.prototype.shoot = function() {
@@ -174,29 +197,30 @@ Plane.prototype.shoot = function() {
 }
 
 Plane.prototype.update_position = function() {
-  var direction = sign(this.speed_x);
-  sign(direction) != sign(this.rotation) ? this.mesh.position.x += this.speed_x / 5 : this.mesh.position.x += this.speed_x;
-  if (this.mesh.position.x < LEFT_BORDER) {
-    this.mesh.position.x = LEFT_BORDER;
-    this.speed_x = 0;
-  }
-  if (this.mesh.position.x > RIGHT_BORDER) {
-    this.mesh.position.x = RIGHT_BORDER
-    this.speed_x = 0;
+  this.speed_x = this.rotations * MAX_SPEED_X / PLANE_MAX_ROTATIONS;
+  if (Math.abs(this.mesh.position.x) < BORDER_X || this.direction_x != sign(this.mesh.position.x)) {
+    this.mesh.position.x += this.speed_x;
+    this.camera.position.x += this.speed_x / 2;
+    this.exhaust.plane_move(this.mesh.position, this.rotations);
+  } else {
+    this.mesh.position.x = sign(this.mesh.position.x) * BORDER_X;
+    this.camera.position.x = sign(this.mesh.position.x) * BORDER_X / 2;
+    this.direction_x = 0;
   }
 
-  sign(direction) != sign(this.rotation) ? this.camera.position.x += this.speed_x / 10 : this.camera.position.x += this.speed_x / 2;
-  this.exhaust.move(this.mesh.position, this.rotation);
+  this.rotate();
+}
 
-  if (this.speed_x != 0) {
-    if (Math.abs(this.rotation * PLANE_ANGLE_STEP) <= PLANE_MAX_ANGLE || sign(direction) != sign(this.rotation)) {
-      this.rotation += direction;
-      this.mesh.rotateY(PLANE_ANGLE_STEP * direction);
+Plane.prototype.rotate = function() {
+  if (this.direction_x != 0) {
+    if (Math.abs(this.rotations) < PLANE_MAX_ROTATIONS || this.direction_x != sign(this.rotations)) {
+      this.rotations += this.direction_x;
+      this.mesh.rotateY(PLANE_ANGLE_STEP * this.direction_x);
     }
   } else {
-    if (this.rotation != 0) {
-      this.mesh.rotateY(-sign(this.rotation) * PLANE_ANGLE_STEP);
-      this.rotation += -sign(this.rotation);
+    if (this.rotations != 0) {
+      this.mesh.rotateY(-sign(this.rotations) * PLANE_ANGLE_STEP);
+      this.rotations += -sign(this.rotations);
     }
   }
 }
@@ -234,7 +258,7 @@ function Exhaust() {
   this.meshes_array = this.initialize_mesh(-0.8, -0.1, 9);
 }
 
-Exhaust.prototype.move = function(parent_position, rotation) {
+Exhaust.prototype.plane_move = function(parent_position, rotation) {
   for (var i = 0; i < this.meshes_array.length; i++) {
     this.meshes_array[i].position.z = parent_position.z + 9;
     i == 0 ? this.meshes_array[i].position.x = parent_position.x - 0.8 : this.meshes_array[i].position.x = parent_position.x + 0.8;
@@ -299,7 +323,7 @@ function IronMan (scene) {
   this.initialize_mesh();
   this.initialize_explosion_mesh();
   this.boom_duration = 0;
-  this.rotation = 0;
+  this.rotations = 0;
 }
 
 IronMan.prototype.initialize_mesh = function() {
@@ -309,10 +333,10 @@ IronMan.prototype.initialize_mesh = function() {
   loader.load('models/Mark_42.obj', 'models/Mark_42.mtl',
     function ( object ) {
       iron_man.mesh = object;
-      iron_man.mesh.rotateX(-Math.PI / 2);
+      iron_man.mesh.rotateX(-Math.PI /2 + 0.2);
       iron_man.mesh.rotateY(Math.PI);
       iron_man.mesh.position.z = -130;
-      iron_man.mesh.scale.set(5.5,5.5,5.5);
+      iron_man.mesh.scale.set(3, 3, 3);
       iron_man.scene.add( iron_man.mesh );
       iron_man.ready = true;
     }
@@ -357,11 +381,9 @@ IronMan.prototype.explosion = function() {
   this.boom_duration += 1;
 }
 
-IronMan.prototype.move = function(bullets) {
-  if (this.boom_duration > 0) return;
-  var collision_is_near = false;
-  var clothest_bullets = [];
-  var direction = 0;
+
+IronMan.prototype.choose_direction = function(bullets) {
+  var collision_is_near = false, clothest_bullets = [], direction = 0;
 
   for (var i = 0; i < bullets.length; i++) {
     if (bullets[i].mesh.position.x <= this.mesh.position.x + IRON_MAN_RADAR_RADIUS &&
@@ -385,37 +407,36 @@ IronMan.prototype.move = function(bullets) {
     for (var i = 0; i < clothest_bullets.length; i++)
       clothest_bullets[i].mesh.position.x <= this.mesh.position.x ? direction += 1 / (i + 1) : direction -= 1 / (i + 1);
 
-    direction > 0 ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
+    this.direction_x = sign(direction);
   } else {
-    if (this.mesh.position.x != 0)
-      (this.mesh.position.x < 0) ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
-    else
-      this.speed_x = 0;
+    this.direction_x = -sign(this.mesh.position.x);
   }
+}
+
+IronMan.prototype.move = function(bullets) {
+  if (this.boom_duration > 0) return;
+  this.choose_direction(bullets)
+  this.speed_x = this.rotations * IRON_MAN_SPEED_X;
 
   this.mesh.position.x += this.speed_x;
-  if (this.mesh.position.x < LEFT_BORDER) {
-    this.mesh.position.x = LEFT_BORDER;
-    this.speed_x = 0;
-  }
-  if (this.mesh.position.x > RIGHT_BORDER) {
-    this.mesh.position.x = RIGHT_BORDER
-    this.speed_x = 0;
+  if (Math.abs(this.mesh.position.x) > BORDER_X) {
+    this.mesh.position.x = sign(this.mesh.position.x) * BORDER_X;
+    this.direction_x = 0;
   }
 
-  if (direction != 0)
-    direction < 0 ? direction = -1 : direction = 1;
-  if (sign(direction) != sign(this.rotation)) this.speed_x /= 2;
+  this.rotate();
+}
 
+IronMan.prototype.rotate = function() {
   if (this.speed_x != 0) {
-    if (Math.abs(this.rotation * IRON_MAN_ANGLE_STEP) <= IRON_MAN_MAX_ANGLE || sign(direction) != sign(this.rotation)) {
-      this.rotation += sign(this.speed_x);
+    if (Math.abs(this.rotations) <= IRON_MAN_MAX_ROTATIONS || sign(this.rotations) != sign(this.speed_x)) {
+      this.rotations += sign(this.speed_x);
       this.mesh.rotateY(IRON_MAN_ANGLE_STEP * sign(this.speed_x));
     }
   } else {
-    if (this.rotation != 0) {
-      this.mesh.rotateY(-sign(this.rotation) * IRON_MAN_ANGLE_STEP);
-      this.rotation += -sign(this.rotation);
+    if (this.rotations != 0) {
+      this.mesh.rotateY(-sign(this.rotations) * IRON_MAN_ANGLE_STEP);
+      this.rotations += -sign(this.rotations);
     }
   }
 }
