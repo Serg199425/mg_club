@@ -7,9 +7,9 @@ $(document).on('ready', function() {
 
 var WIDTH = window.innerWidth - 20;
 var HEIGHT = window.innerHeight - 20;
-var LEFT_BORDER = - window.innerWidth / 2;
-var RIGHT_BORDER = - window.innerWidth/ 2;
-var UP_BORDER = 0;
+var LEFT_BORDER = -40;
+var RIGHT_BORDER = 40;
+var FRONT_BORDER_Z = -170;
 var DOWN_BORDER = window.innerHeight;
 var PLANE_MAX_ANGLE = 0.5;
 var PLANE_ANGLE_STEP = 0.05;
@@ -22,8 +22,8 @@ var BOOM_DURATION_CIRCLES = 100;
 var CLOUD_SPEED_X = 1;
 var CLOUD_SPEED_Y = 20;
 var CLOUD_BOOM_SPEED = 40;
-var IRON_MAN_SPEED_X = 5;
-var IRON_MAN_RADAR_RADIUS = 200;
+var IRON_MAN_SPEED_X = 1;
+var IRON_MAN_RADAR_RADIUS = 20;
 var RELOAD_TIME = 10;
 var game_is_started = false;
 var MODELS_COUNT = 2;
@@ -34,6 +34,8 @@ var BULLET_OFFSET = 2;
 function render() {
   requestAnimationFrame( render );
   renderer.render( scene, camera );
+  iron_man.check_collision(plane.bullets);
+  iron_man.move(plane.bullets);
   enviroment.move();
   stats.update();
 }
@@ -119,7 +121,7 @@ $(document).keydown(function (e) {
         plane.start_move(1);
     }
     if (keys[32])
-      plane.shoot();
+      plane.is_shooting = true;
     previous_keys = keys;
 });
 
@@ -127,6 +129,8 @@ $(document).keyup(function (e) {
     delete keys[e.which];
     if (!keys[37] && !keys[39])
       plane.stop_move();
+    if (!keys[32])
+      plane.is_shooting = false;
 });
 
 function Plane (scene, camera) {
@@ -138,10 +142,12 @@ function Plane (scene, camera) {
   this.rotation = 0;
   this.exhaust = new Exhaust();
   this.initialize_mesh(scene);
+  this.is_shooting = false;
 }
 
 Plane.prototype.move = function() {
   this.reload();
+  this.shoot();
   this.update_position();
   this.update_bullets_position();
 }
@@ -159,21 +165,21 @@ Plane.prototype.stop_move = function() {
 }
 
 Plane.prototype.shoot = function() {
-  if (this.reload_time > 0) return;
+  if (this.reload_time > 0 || this.is_shooting == false) return;
   this.reload_time = RELOAD_TIME;
-  this.bullets.push(new Bullet(this.scene, this.mesh.position, 1));
-  this.bullets.push(new Bullet(this.scene, this.mesh.position, -1));
+  this.bullets.push(new Bullet(this.scene, this.mesh.position, 0.5));
+  this.bullets.push(new Bullet(this.scene, this.mesh.position, -0.5));
 }
 
 Plane.prototype.update_position = function() {
   var direction = sign(this.speed_x);
   sign(direction) != sign(this.rotation) ? this.mesh.position.x += this.speed_x / 5 : this.mesh.position.x += this.speed_x;
-  if (this.mesh.position.x < -40) {
-    this.mesh.position.x = -40;
+  if (this.mesh.position.x < LEFT_BORDER) {
+    this.mesh.position.x = LEFT_BORDER;
     this.speed_x = 0;
   }
-  if (this.mesh.position.x > 40) {
-    this.mesh.position.x = 40
+  if (this.mesh.position.x > RIGHT_BORDER) {
+    this.mesh.position.x = RIGHT_BORDER
     this.speed_x = 0;
   }
 
@@ -287,24 +293,112 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
 
 function IronMan (scene) {
   this.speed_x = IRON_MAN_SPEED_X;
-  this.initialize_mesh(scene);
+  this.scene = scene;
+  this.initialize_mesh();
+  this.initialize_explosion_mesh();
+  this.boom_duration = 0;
 }
 
-IronMan.prototype.initialize_mesh = function(scene) {
+IronMan.prototype.initialize_mesh = function() {
   var loader = new THREE.OBJMTLLoader();
   var iron_man = this;
 
   loader.load('models/Mark_42.obj', 'models/Mark_42.mtl',
     function ( object ) {
-      iron_man = object;
-      iron_man.rotateX(-Math.PI / 2);
-      iron_man.rotateY(Math.PI);
-      iron_man.position.z = -130;
-      iron_man.scale.set(2.5,2.5,2.5);
-      scene.add( iron_man );
-      this.ready = true;
+      iron_man.mesh = object;
+      iron_man.mesh.rotateX(-Math.PI / 2);
+      iron_man.mesh.rotateY(Math.PI);
+      iron_man.mesh.position.z = -130;
+      iron_man.mesh.scale.set(2.5,2.5,2.5);
+      iron_man.scene.add( iron_man.mesh );
+      iron_man.ready = true;
     }
   );
+}
+
+IronMan.prototype.initialize_explosion_mesh = function() {
+  this.explosion_mesh = new THREE.Mesh( new THREE.SphereGeometry( 1, 16, 8 ) ,
+    new THREE.MeshBasicMaterial( { color: 0x00aaff } )
+  );
+}
+
+IronMan.prototype.check_collision = function(bullets) {
+  if (this.boom_duration != 0) {
+    this.explosion();
+    return;
+  }
+  for (var i = 0; i < bullets.length; i++) {
+    if (bullets[i].mesh.position.x <= this.mesh.position.x + 3 &&
+        bullets[i].mesh.position.x >= this.mesh.position.x - 3 &&
+        bullets[i].mesh.position.z > FRONT_BORDER_Z &&
+        bullets[i].mesh.position.z < FRONT_BORDER_Z + 6) 
+      this.boom_duration = 1;
+  }
+}
+
+IronMan.prototype.explosion = function() {
+  if (this.boom_duration == 0) return;
+  this.explosion_mesh.position.set(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z);
+  this.explosion_mesh.scale.set(this.boom_duration, this.boom_duration, this.boom_duration);
+
+  if (this.boom_duration == 1) {
+    this.scene.add(this.explosion_mesh);
+  }
+
+  if (this.boom_duration > BOOM_DURATION_CIRCLES) {
+    this.boom_duration = 0;
+    this.scene.remove(this.explosion_mesh);
+    return;
+  }
+
+  this.boom_duration += 1;
+}
+
+IronMan.prototype.move = function(bullets) {
+  if (this.boom_duration > 0) return;
+  var collision_is_near = false;
+  var clothest_bullets = [];
+  var direction = 0;
+
+  for (var i = 0; i < bullets.length; i++) {
+    if (bullets[i].mesh.position.x <= this.mesh.position.x + IRON_MAN_RADAR_RADIUS &&
+        bullets[i].mesh.position.x >= this.mesh.position.x - IRON_MAN_RADAR_RADIUS && 
+        bullets[i].mesh.position.z > FRONT_BORDER_Z) {
+      clothest_bullets.push(bullets[i])
+      collision_is_near = true;
+    }
+  }
+
+  if (collision_is_near == true) {
+    clothest_bullets.sort(function(a, b) {
+      if (a.mesh.position.z < b.mesh.position.z)
+        return -1;
+      if (a.mesh.position.z > b.mesh.position.z)
+        return 1;
+      if (a.mesh.position.z == b.mesh.position.z)
+        return 0;
+    });
+
+    for (var i = 0; i < clothest_bullets.length; i++)
+      clothest_bullets[i].mesh.position.x <= this.mesh.position.x ? direction += 1 / (i + 1) : direction -= 1 / (i + 1);
+
+    direction > 0 ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
+  } else {
+    if (this.mesh.position.x != 0)
+      (this.mesh.position.x < 0) ? this.speed_x = IRON_MAN_SPEED_X : this.speed_x = -IRON_MAN_SPEED_X;
+    else
+      this.speed_x = 0;
+  }
+
+  this.mesh.position.x += this.speed_x;
+  if (this.mesh.position.x < LEFT_BORDER) {
+    this.mesh.position.x = LEFT_BORDER;
+    this.speed_x = 0;
+  }
+  if (this.mesh.position.x > RIGHT_BORDER) {
+    this.mesh.position.x = RIGHT_BORDER
+    this.speed_x = 0;
+  }
 }
 
 
@@ -403,17 +497,17 @@ function Bullet(scene, pos_vector, side) {
 }
 
 Bullet.prototype.initialize_mesh = function(scene, pos_vector, side) {
-  this.mesh = new THREE.Mesh(new THREE.BoxGeometry( 0.1, 1, 1 ),
+  this.mesh = new THREE.Mesh(new THREE.BoxGeometry( 0.1, 0.1, 5 ),
     new THREE.MeshBasicMaterial( { color: 0xFFFF00 })
   );
 
-  this.mesh.position.set(pos_vector.x + side * BULLET_OFFSET, 0, 0)
+  this.mesh.position.set(pos_vector.x + side * BULLET_OFFSET, 0, 0);
   scene.add( this.mesh );
 }
 
 Bullet.prototype.move = function() {
   this.mesh.position.z -= BULLET_SPEED_Z;
-  if (this.mesh.position.z < -170) {
+  if (this.mesh.position.z < FRONT_BORDER_Z) {
     this.scene.remove(this.mesh)
     return false;
   }
