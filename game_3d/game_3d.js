@@ -13,6 +13,8 @@ var FRONT_BORDER_Z = -170;
 var DOWN_BORDER = window.innerHeight;
 var PLANE_MAX_ANGLE = 0.5;
 var PLANE_ANGLE_STEP = 0.05;
+var IRON_MAN_MAX_ANGLE = 1.0;
+var IRON_MAN_ANGLE_STEP = 0.2;
 var MAX_SPEED_X = 1;
 var SPEED_UP_STEP = 5;
 var SPEED_DOWN_STEP = 1;
@@ -297,6 +299,7 @@ function IronMan (scene) {
   this.initialize_mesh();
   this.initialize_explosion_mesh();
   this.boom_duration = 0;
+  this.rotation = 0;
 }
 
 IronMan.prototype.initialize_mesh = function() {
@@ -309,7 +312,7 @@ IronMan.prototype.initialize_mesh = function() {
       iron_man.mesh.rotateX(-Math.PI / 2);
       iron_man.mesh.rotateY(Math.PI);
       iron_man.mesh.position.z = -130;
-      iron_man.mesh.scale.set(2.5,2.5,2.5);
+      iron_man.mesh.scale.set(5.5,5.5,5.5);
       iron_man.scene.add( iron_man.mesh );
       iron_man.ready = true;
     }
@@ -398,6 +401,22 @@ IronMan.prototype.move = function(bullets) {
   if (this.mesh.position.x > RIGHT_BORDER) {
     this.mesh.position.x = RIGHT_BORDER
     this.speed_x = 0;
+  }
+
+  if (direction != 0)
+    direction < 0 ? direction = -1 : direction = 1;
+  if (sign(direction) != sign(this.rotation)) this.speed_x /= 2;
+
+  if (this.speed_x != 0) {
+    if (Math.abs(this.rotation * IRON_MAN_ANGLE_STEP) <= IRON_MAN_MAX_ANGLE || sign(direction) != sign(this.rotation)) {
+      this.rotation += sign(this.speed_x);
+      this.mesh.rotateY(IRON_MAN_ANGLE_STEP * sign(this.speed_x));
+    }
+  } else {
+    if (this.rotation != 0) {
+      this.mesh.rotateY(-sign(this.rotation) * IRON_MAN_ANGLE_STEP);
+      this.rotation += -sign(this.rotation);
+    }
   }
 }
 
