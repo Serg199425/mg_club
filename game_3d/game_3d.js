@@ -25,7 +25,7 @@ var IRON_MAN_ANGLE_STEP = 0.1;
 var BOOM_SPEED = 20;
 var BOOM_DURATION_CIRCLES = 100;
 var IRON_MAN_SPEED_X = 0.5;
-var IRON_MAN_RADAR_RADIUS = 20;
+var IRON_MAN_RADAR_RADIUS = 10;
 
 var CLOUD_SPEED_X = 1;
 var CLOUD_SPEED_Y = 20;
@@ -34,6 +34,9 @@ var CLOUD_BOOM_SPEED = 40;
 var game_is_started = false;
 var MODELS_COUNT = 2;
 var WATER_SPEED = 5;
+
+var camera_vibration_direction = 1;
+var CAMERA_VIBRATION_VALUE = 0.1;
 
 function render() {
   requestAnimationFrame( render );
@@ -102,6 +105,12 @@ function move_objects() {
   iron_man.check_collision(plane.bullets);
   iron_man.move(plane.bullets);
   enviroment.move();
+  camera_vibration();
+}
+
+function camera_vibration() {
+  camera.position.x += - CAMERA_VIBRATION_VALUE * sign(camera_vibration_direction);
+  camera_vibration_direction = -sign(camera_vibration_direction);
 }
 
 var keys = {};
@@ -318,7 +327,7 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
 
 
 function IronMan (scene) {
-  this.speed_x = IRON_MAN_SPEED_X;
+  this.direction_x = 0;
   this.scene = scene;
   this.initialize_mesh();
   this.initialize_explosion_mesh();
@@ -409,17 +418,19 @@ IronMan.prototype.choose_direction = function(bullets) {
 
     this.direction_x = sign(direction);
   } else {
-    this.direction_x = -sign(this.mesh.position.x);
+    Math.abs(this.mesh.position.x) > IRON_MAN_SPEED_X + 1 ? this.direction_x = -sign(this.mesh.position.x) : this.direction_x = 0;
   }
 }
 
 IronMan.prototype.move = function(bullets) {
   if (this.boom_duration > 0) return;
-  this.choose_direction(bullets)
-  this.speed_x = this.rotations * IRON_MAN_SPEED_X;
+  this.choose_direction(bullets);
+  this.speed_x = this.rotations * IRON_MAN_SPEED_X / IRON_MAN_MAX_ROTATIONS;
 
-  this.mesh.position.x += this.speed_x;
-  if (Math.abs(this.mesh.position.x) > BORDER_X) {
+
+  if (Math.abs(this.mesh.position.x) < BORDER_X || this.direction_x != sign(this.mesh.position.x)) {
+    this.mesh.position.x += this.speed_x;
+  } else {
     this.mesh.position.x = sign(this.mesh.position.x) * BORDER_X;
     this.direction_x = 0;
   }
@@ -428,10 +439,10 @@ IronMan.prototype.move = function(bullets) {
 }
 
 IronMan.prototype.rotate = function() {
-  if (this.speed_x != 0) {
-    if (Math.abs(this.rotations) <= IRON_MAN_MAX_ROTATIONS || sign(this.rotations) != sign(this.speed_x)) {
-      this.rotations += sign(this.speed_x);
-      this.mesh.rotateY(IRON_MAN_ANGLE_STEP * sign(this.speed_x));
+  if (this.direction_x != 0) {
+    if (Math.abs(this.rotations) < IRON_MAN_MAX_ROTATIONS || sign(this.rotations) != this.direction_x) {
+      this.rotations += this.direction_x;
+      this.mesh.rotateY(IRON_MAN_ANGLE_STEP * this.direction_x);
     }
   } else {
     if (this.rotations != 0) {
