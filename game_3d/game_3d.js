@@ -21,6 +21,7 @@ var BULLET_SPEED_Y = 10;
 var BULLET_SPEED_Z = 8;
 var BULLET_OFFSET = 2;
 var RELOAD_TIME = 10;
+var PLANE_EXPLOISON_CIRCLES = 100;
 
 var IRON_MAN_MAX_ROTATIONS = 8;
 var IRON_MAN_ANGLE_STEP = 0.05;
@@ -184,9 +185,16 @@ function Plane (scene, camera) {
   this.is_shooting = false;
   this.direction_x = 0;
   this.direction_y = 0;
+  this.exploison_circles = 0;
+  this.explosion_vertices = [];
+  this.explosion_rotations = [];
 }
 
 Plane.prototype.move = function() {
+  if (this.exploison_circles != 0) {
+    this.explosion();
+    return;
+  }
   this.reload();
   this.shoot();
   this.update_position();
@@ -295,6 +303,67 @@ Plane.prototype.update_bullets_position = function() {
   }
 }
 
+Plane.prototype.explosion = function() {
+  this.exploison_circles += 1;
+  if (this.exploison_circles == 1) {
+    this.exhaust_visible_change(false);
+    for (var  i = 0; i < this.mesh.children.length; i++)
+      this.explosion_vertices[i] = new THREE.Vector3(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
+
+    for (var  i = 0; i < this.mesh.children.length; i++)
+      this.explosion_rotations[i] = new THREE.Euler(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
+  }
+
+  for (var i = 0; i < this.mesh.children.length; i++) {
+    this.mesh.children[i].position.x += this.explosion_vertices[i].x;
+    this.mesh.children[i].position.y += this.explosion_vertices[i].y;
+    this.mesh.children[i].position.z += this.explosion_vertices[i].z;
+    this.mesh.children[i].rotation.x += this.explosion_rotations[i].x;
+    this.mesh.children[i].rotation.y += this.explosion_rotations[i].y;
+    this.mesh.children[i].rotation.z += this.explosion_rotations[i].z;
+  }
+
+  if (this.exploison_circles > PLANE_EXPLOISON_CIRCLES) {
+    this.exploison_circles = 0;
+    this.cancel_exploison();
+    this.explosion_vertices = [];
+    this,explosion_rotations = [];
+    this.exhaust_visible_change(true);
+  }
+  //     positionStyle  : Type.SPHERE,
+  //   positionBase   : new THREE.Vector3( 0, 50, 0 ),
+  //   positionRadius : 2,
+        
+  //   velocityStyle : Type.SPHERE,
+  //   speedBase     : 40,
+  //   speedSpread   : 8,
+    
+  //   particleTexture : THREE.ImageUtils.loadTexture( 'images/smokeparticle.png' ),
+
+  //   sizeTween    : new Tween( [0, 0.1], [1, 150] ),
+  //   opacityTween : new Tween( [0.7, 1], [1, 0] ),
+  //   colorBase    : new THREE.Vector3(0.02, 1, 0.4),
+  //   blendStyle   : THREE.AdditiveBlending,  
+    
+  //   particlesPerSecond : 60,
+  //   particleDeathAge   : 1.5,   
+  //   emitterDeathAge    : 60
+}
+
+Plane.prototype.cancel_exploison = function() {
+  for (var i = 0; i < this.mesh.children.length; i++) {
+    this.mesh.children[i].position.x -= this.explosion_vertices[i].x * (PLANE_EXPLOISON_CIRCLES + 1);
+    this.mesh.children[i].position.y -= this.explosion_vertices[i].y * (PLANE_EXPLOISON_CIRCLES + 1);
+    this.mesh.children[i].position.z -= this.explosion_vertices[i].z * (PLANE_EXPLOISON_CIRCLES + 1);
+    this.mesh.children[i].rotation.set(0,0,0);
+  }
+}
+
+Plane.prototype.exhaust_visible_change = function(visible) {
+  for (var  i = 0; i < this.exhaust.meshes_array.length; i++)
+    this.exhaust.meshes_array[i].visible = visible;
+}
+
 
 function Exhaust() {
   this.meshes_array = this.initialize_mesh(-0.8, -0.1, 9);
@@ -304,7 +373,6 @@ Exhaust.prototype.plane_move = function(parent_position, rotation_x, rotation_y)
   for (var i = 0; i < this.meshes_array.length; i++) {
     this.meshes_array[i].position.z = parent_position.z + 9;
     i == 0 ? this.meshes_array[i].position.x = parent_position.x - 0.8 : this.meshes_array[i].position.x = parent_position.x + 0.8;
-
     if (rotation_x != 0) {
       i == 0 ? this.meshes_array[i].position.y = parent_position.y + 0.02 * rotation_x : this.meshes_array[i].position.y = parent_position.y - 0.02 * rotation_x;
     } else {
@@ -341,7 +409,8 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
         velocitySpread: new THREE.Vector3(10, 7.5, 10),
 
         colorStart: new THREE.Color(0xff5a00),
-        colorEnd: new THREE.Color('gray'),
+        colorMiddle: new THREE.Color( 'gray' ),
+        colorEnd: new THREE.Color('white'),
 
         sizeStart: 10,
         sizeEnd: 10,
@@ -589,7 +658,7 @@ Bullet.prototype.initialize_mesh = function(scene, pos_vector, side) {
     new THREE.MeshBasicMaterial( { color: 0xFFFF00 })
   );
 
-  this.mesh.position.set(pos_vector.x + side * BULLET_OFFSET, 0, 0);
+  this.mesh.position.set(pos_vector.x + side * BULLET_OFFSET, pos_vector.y, 0);
   scene.add( this.mesh );
 }
 
