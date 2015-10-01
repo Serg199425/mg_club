@@ -472,6 +472,8 @@ function IronMan (scene) {
   this.initialize_explosion_mesh();
   this.exploison_circles = 0;
   this.rotations_x = 0;
+  this.explosion_vertices = [];
+  this.explosion_rotations = [];
 }
 
 IronMan.prototype.initialize_mesh = function() {
@@ -500,18 +502,44 @@ IronMan.prototype.initialize_explosion_mesh = function() {
 IronMan.prototype.explosion = function() {
   if (this.exploison_circles == 0) {
     this.exploison_circles = 1;
+    for (var  i = 0; i < this.mesh.children.length; i++)
+      this.explosion_vertices[i] = new THREE.Vector3(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
+
+    for (var  i = 0; i < this.mesh.children.length; i++)
+      this.explosion_rotations[i] = new THREE.Euler(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
     this.explosion_mesh = new Exploison(this.mesh.position.clone(), IRON_MAN_EXPLOISON_CIRCLES, 'blue');
+  }
+
+  for (var i = 0; i < this.mesh.children.length; i++) {
+    this.mesh.children[i].position.x += this.explosion_vertices[i].x;
+    this.mesh.children[i].position.y += this.explosion_vertices[i].y;
+    this.mesh.children[i].position.z += this.explosion_vertices[i].z;
+    this.mesh.children[i].rotation.x += this.explosion_rotations[i].x;
+    this.mesh.children[i].rotation.y += this.explosion_rotations[i].y;
+    this.mesh.children[i].rotation.z += this.explosion_rotations[i].z;
   }
 
   if (this.exploison_circles > IRON_MAN_EXPLOISON_CIRCLES) {
     this.exploison_circles = 0;
     this.explosion_mesh.remove();
+    this.cancel_exploison();
+    this.explosion_vertices = [];
+    this,explosion_rotations = [];
     delete this.explosion_mesh;
     return;
   }
 
   this.explosion_mesh.update();
   this.exploison_circles += 1;
+}
+
+IronMan.prototype.cancel_exploison = function() {
+  for (var i = 0; i < this.mesh.children.length; i++) {
+    this.mesh.children[i].position.x -= this.explosion_vertices[i].x * (IRON_MAN_EXPLOISON_CIRCLES + 1);
+    this.mesh.children[i].position.y -= this.explosion_vertices[i].y * (IRON_MAN_EXPLOISON_CIRCLES + 1);
+    this.mesh.children[i].position.z -= this.explosion_vertices[i].z * (IRON_MAN_EXPLOISON_CIRCLES + 1);
+    this.mesh.children[i].rotation.set(0,0,0);
+  }
 }
 
 
@@ -600,7 +628,7 @@ Water.prototype.move = function() {
 }
 
 Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
-  var plane = new THREE.BufferGeometry().fromGeometry(new THREE.PlaneGeometry( WATER_PLANE_LENGTH, WATER_PLANE_WIDTH));
+  var plane = new THREE.PlaneBufferGeometry( WATER_PLANE_LENGTH, WATER_PLANE_WIDTH);
 
 
   var water_normals = THREE.ImageUtils.loadTexture( 'models/ocean.jpg' );
