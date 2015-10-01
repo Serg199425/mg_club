@@ -8,7 +8,7 @@ $(document).on('ready', function() {
 var WIDTH = window.innerWidth - 20;
 var HEIGHT = window.innerHeight - 20;
 var BORDER_X = 60;
-var BORDER_Y = 50;
+var BORDER_Y = 30;
 var FRONT_BORDER_Z = -170;
 var PLANE_MAX_ROTATIONS = 20;
 var PLANE_ANGLE_STEP_X = 0.02;
@@ -94,13 +94,14 @@ function initialize_objects() {
   var light = new THREE.AmbientLight( 0xffffff ); // soft white light
   scene.add( light );
 
-  var directional_light = new THREE.DirectionalLight(0xffff55, 1);
-  directional_light.position.set(-600, 300, 600);
+  var directional_light = new THREE.DirectionalLight(0xffffFF, 1);
+  directional_light.position.set(-600, 300, 600).normalize();
   scene.add(directional_light);
 
   plane = new Plane(scene, camera);
   iron_man = new IronMan(scene);
   enviroment = new Enviroment(scene, directional_light);
+  terrain = new Terrain();
 }
 
 function start() {
@@ -170,6 +171,36 @@ $(document).keyup(function (e) {
       plane.is_shooting = false;
     }
 });
+
+function Terrain() {
+  this.initialize_mesh();
+}
+
+Terrain.prototype.initialize_mesh = function() {
+  var parameters = {
+    alea: RAND_MT,
+    generator: PN_GENERATOR,
+    width: 200,
+    height: 200,
+    widthSegments: 450,
+    heightSegments: 450,
+    depth: 50,
+    param: 4,
+    filterparam: 1,
+    filter: [ CIRCLE_FILTER ],
+    postgen: [ MOUNTAINS_COLORS ],
+    effect: [ DESTRUCTURE_EFFECT ]
+  };
+
+  var terrainGeo = TERRAINGEN.Get(parameters);
+  var terrainMaterial = new THREE.MeshPhongMaterial({ vertexColors: THREE.VertexColors, shading: THREE.SmoothShading, side: THREE.DoubleSide });
+  
+  var terrain = new THREE.Mesh(terrainGeo, terrainMaterial);
+  terrain.position.y = - BORDER_Y - 30;
+  terrain.position.z = - 200;
+  this.mesh = terrain;
+  scene.add(terrain);
+}
 
 function Plane (scene, camera) {
   this.camera = camera;
@@ -506,7 +537,7 @@ IronMan.prototype.explosion = function() {
       this.explosion_vertices[i] = new THREE.Vector3(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
 
     for (var  i = 0; i < this.mesh.children.length; i++)
-      this.explosion_rotations[i] = new THREE.Euler(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
+      this.explosion_rotations[i] = new THREE.Euler(1 - 2 * Math.random(), 1 - 2 * Math.random(), 3 - 2 * Math.random());
     this.explosion_mesh = new Exploison(this.mesh.position.clone(), IRON_MAN_EXPLOISON_CIRCLES, 'blue');
   }
 
@@ -638,7 +669,7 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
       textureWidth: 512, 
       textureHeight: 512,
       waterNormals: water_normals,
-      alpha:  0.2,
+      alpha:  1,
       sunDirection: directional_light.position.normalize(),
       sunColor: 0xffffff,
       waterColor: 0x001FFf,
@@ -648,7 +679,7 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
   var water_mesh = new THREE.Mesh(plane, this.water_controller.material);
 
   water_mesh.rotateZ(Math.PI / 2);
-  water_mesh.position.y = - BORDER_Y - 10;
+  water_mesh.position.y = - BORDER_Y - 20;
   water_mesh.position.z = pos_z;
 
   water_mesh.add(this.water_controller);

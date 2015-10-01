@@ -1,8 +1,8 @@
 # Blender MTL File: 'None'
-# Material Count: 4
+# Material Count: 7
 
 newmtl glass
-Ns 7.843137
+Ns 5.882353
 Ka 0.117647 0.117647 0.117647
 Kd 1.000000 1.000000 1.000000
 Ks 0.752941 0.752941 0.752941
@@ -13,7 +13,7 @@ illum 2
 map_Kd Glass_Cockpit.png
 
 newmtl pilot
-Ns 7.843137
+Ns 5.882353
 Ka 0.117647 0.117647 0.117647
 Kd 1.000000 1.000000 1.000000
 Ks 0.752941 0.752941 0.752941
@@ -24,7 +24,43 @@ illum 2
 map_Kd Pilot_usa.png
 
 newmtl plane
-Ns 7.843137
+Ns 5.882353
+Ka 0.117647 0.117647 0.117647
+Kd 1.000000 1.000000 1.000000
+Ks 0.752941 0.752941 0.752941
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd Su-47_Berkut_P01.png
+map_Bump Su-47_Berkut_N.png
+
+newmtl plane.001
+Ns 5.882353
+Ka 0.117647 0.117647 0.117647
+Kd 1.000000 1.000000 1.000000
+Ks 0.752941 0.752941 0.752941
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd Su-47_Berkut_P01.png
+map_Bump Su-47_Berkut_N.png
+
+newmtl plane.002
+Ns 5.882353
+Ka 0.117647 0.117647 0.117647
+Kd 1.000000 1.000000 1.000000
+Ks 0.752941 0.752941 0.752941
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd Su-47_Berkut_P01.png
+map_Bump Su-47_Berkut_N.png
+
+newmtl plane.003
+Ns 5.882353
 Ka 0.117647 0.117647 0.117647
 Kd 1.000000 1.000000 1.000000
 Ks 0.752941 0.752941 0.752941
@@ -36,7 +72,7 @@ map_Kd Su-47_Berkut_P01.png
 map_Bump Su-47_Berkut_N.png
 
 newmtl seat
-Ns 7.843137
+Ns 5.882353
 Ka 0.117647 0.117647 0.117647
 Kd 1.000000 1.000000 1.000000
 Ks 0.752941 0.752941 0.752941
