@@ -8,7 +8,7 @@ $(document).on('ready', function() {
 var WIDTH = window.innerWidth - 20;
 var HEIGHT = window.innerHeight - 20;
 var BORDER_X = 60;
-var BORDER_Y = 30;
+var BORDER_Y = 40;
 var FRONT_BORDER_Z = -170;
 var PLANE_MAX_ROTATIONS = 20;
 var PLANE_ANGLE_STEP_X = 0.02;
@@ -39,12 +39,17 @@ var CLOUD_BOOM_SPEED = 40;
 var game_is_started = false;
 var MODELS_COUNT = 2;
 var WATER_SPEED = 10;
-var WATER_PLANE_LENGTH = 10000;
-var WATER_PLANE_WIDTH = 10000;
+var WATER_PLANE_LENGTH = 20000;
+var WATER_PLANE_WIDTH = 8000;
 
 var camera_vibration_direction = 1;
 var CAMERA_VIBRATION_VALUE = 0.15;
 var CAMERA_POSITION_Y = 10;
+
+var TERRAINS_COUNT = 20;
+var TERRAINS_INTERVAL = 4500;
+var TERRAIN_SPEED = 40;
+var TERRAIN_REAR_BORDER_Z = 0;
 
 function render() {
   requestAnimationFrame( render );
@@ -101,7 +106,24 @@ function initialize_objects() {
   plane = new Plane(scene, camera);
   iron_man = new IronMan(scene);
   enviroment = new Enviroment(scene, directional_light);
-  terrain = new Terrain();
+  enviroment.add(new Water(-WATER_PLANE_LENGTH / 2, scene, directional_light));
+  enviroment.add(new Water(-WATER_PLANE_LENGTH * 1.5, scene, directional_light));
+
+  terrains_in_game_area = [];
+  for (var i = 0; i < TERRAINS_COUNT / 2; i++) {
+    var position_x = BORDER_X * (1 - 2 * Math.random()) * 8;
+    var position_z = - TERRAINS_INTERVAL * (i+1) - Math.random() * TERRAINS_INTERVAL / 2;
+    terrains_in_game_area.push(new Terrain(position_x, position_z, true));
+  }
+  enviroment.objects = enviroment.objects.concat(terrains_in_game_area);
+
+  var side = 0;
+  for (var i = 0; i < TERRAINS_COUNT / 2; i++) {
+    i % 2 == 0 ? side = 1 : side = -1;
+    var position_x = side * 30 * BORDER_X * (1 + Math.random());
+    var position_z = - TERRAINS_INTERVAL * (i+1) - Math.random() * TERRAINS_INTERVAL / 2;
+    enviroment.add(new Terrain(position_x, position_z, false));
+  }
 }
 
 function start() {
@@ -112,7 +134,7 @@ function start() {
 }
 
 function move_objects() {
-  plane.move();
+  plane.move(enviroment.terrains);
   plane.bullets_container.check_collision(iron_man) ? iron_man.explosion() : iron_man.move(plane.bullets_container);
   enviroment.move();
   camera_vibration();
@@ -172,19 +194,22 @@ $(document).keyup(function (e) {
     }
 });
 
-function Terrain() {
-  this.initialize_mesh();
+
+function Terrain(position_x, position_z, in_game_area) {
+  this.in_game_area = in_game_area;
+  this.initialize_mesh(position_x, position_z);
 }
 
-Terrain.prototype.initialize_mesh = function() {
+Terrain.prototype.initialize_mesh = function(position_x, position_z) {
+  var side;
   var parameters = {
     alea: RAND_MT,
     generator: PN_GENERATOR,
     width: 200,
-    height: 200,
-    widthSegments: 450,
-    heightSegments: 450,
-    depth: 50,
+    height: 200 + Math.random() * 100,
+    widthSegments: 20,
+    heightSegments: 20,
+    depth: 50 + BORDER_Y * Math.random() * 5,
     param: 4,
     filterparam: 1,
     filter: [ CIRCLE_FILTER ],
@@ -193,13 +218,24 @@ Terrain.prototype.initialize_mesh = function() {
   };
 
   var terrainGeo = TERRAINGEN.Get(parameters);
-  var terrainMaterial = new THREE.MeshPhongMaterial({ vertexColors: THREE.VertexColors, shading: THREE.SmoothShading, side: THREE.DoubleSide });
+  var terrainMaterial = new THREE.MeshPhongMaterial({ color: 0x535353, shading: THREE.SmoothShading, side: THREE.DoubleSide });
   
   var terrain = new THREE.Mesh(terrainGeo, terrainMaterial);
-  terrain.position.y = - BORDER_Y - 30;
-  terrain.position.z = - 200;
+  terrain.position.x = position_x;
+  terrain.position.y = - BORDER_Y - 40;
+  terrain.position.z = position_z;
   this.mesh = terrain;
   scene.add(terrain);
+}
+
+Terrain.prototype.move = function() {
+  if (this.mesh.position.z > TERRAIN_REAR_BORDER_Z) {
+    this.mesh.position.z = - TERRAINS_COUNT * TERRAINS_INTERVAL / 2;
+    if (this.in_game_area) 
+      this.mesh.position.x = BORDER_X * (1 - 2 * Math.random()) * 8;
+  }
+  else
+    this.mesh.position.z += TERRAIN_SPEED;
 }
 
 function Plane (scene, camera) {
@@ -371,6 +407,10 @@ Plane.prototype.cancel_exploison = function() {
 Plane.prototype.exhaust_visible_change = function(visible) {
   for (var  i = 0; i < this.exhaust.meshes_array.length; i++)
     this.exhaust.meshes_array[i].visible = visible;
+}
+
+Plane.prototype.check_collision = function(terrains) {
+
 }
 
 
@@ -573,7 +613,6 @@ IronMan.prototype.cancel_exploison = function() {
   }
 }
 
-
 IronMan.prototype.choose_direction = function(bullets_container) {
   var bullets = bullets_container.bullets;
   var collision_is_near = false, clothest_bullets = [], direction = 0;
@@ -638,13 +677,17 @@ IronMan.prototype.rotate = function() {
 
 
 function Enviroment(scene, directional_light) {
-  this.water_array = [new Water(-WATER_PLANE_LENGTH / 2, scene, directional_light), new Water(-WATER_PLANE_LENGTH * 1.5, scene, directional_light)];
+  this.objects = [];
   this.skybox = new SkyBox(scene);
 }
 
+Enviroment.prototype.add = function(object) {
+  this.objects.push(object);
+}
+
 Enviroment.prototype.move = function() {
-  for (var index in this.water_array)
-    this.water_array[index].move();
+  for (var index in this.objects)
+    this.objects[index].move();
 }
 
 function Water(pos_z, scene, directional_light) {
@@ -665,21 +708,21 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
   var water_normals = THREE.ImageUtils.loadTexture( 'models/ocean.jpg' );
   water_normals.wrapS = water_normals.wrapT = THREE.RepeatWrapping;
 
-  this.water_controller = new THREE.Water(renderer, camera, scene, {
-      textureWidth: 512, 
-      textureHeight: 512,
-      waterNormals: water_normals,
-      alpha:  1,
-      sunDirection: directional_light.position.normalize(),
-      sunColor: 0xffffff,
-      waterColor: 0x001FFf,
-      distortionScale: 80.0,
-  });
+  this.water_controller = new THREE.Water( renderer, camera, scene, {
+    textureWidth: 128,
+    textureHeight: 128,
+    waterNormals: water_normals,
+    alpha:  1.0,
+    sunDirection: directional_light.position.clone().normalize(),
+    sunColor: 0xffffff,
+    waterColor: 0x001e0f,
+    distortionScale: 50.0,
+  } );
 
   var water_mesh = new THREE.Mesh(plane, this.water_controller.material);
 
   water_mesh.rotateZ(Math.PI / 2);
-  water_mesh.position.y = - BORDER_Y - 20;
+  water_mesh.position.y = - BORDER_Y - 15;
   water_mesh.position.z = pos_z;
 
   water_mesh.add(this.water_controller);
