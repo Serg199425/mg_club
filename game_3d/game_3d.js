@@ -7,12 +7,14 @@ $(document).on('ready', function() {
 
 var WIDTH = window.innerWidth - 20;
 var HEIGHT = window.innerHeight - 20;
-var BORDER_X = 40;
+var BORDER_X = 60;
+var BORDER_Y = 100;
 var FRONT_BORDER_Z = -170;
-var PLANE_MAX_ROTATIONS = 10;
-var PLANE_ANGLE_STEP = 0.05;
-var MAX_SPEED_X = 1;
-var MAX_SPEED_Y = 1;
+var PLANE_MAX_ROTATIONS = 20;
+var PLANE_ANGLE_STEP_X = 0.02;
+var PLANE_ANGLE_STEP_Y = 0.005;
+var MAX_SPEED_X = 0.5;
+var MAX_SPEED_Y = 0.5;
 var SPEED_UP_STEP = 5;
 var SPEED_DOWN_STEP = 1;
 var BULLET_SPEED_Y = 10;
@@ -21,7 +23,7 @@ var BULLET_OFFSET = 2;
 var RELOAD_TIME = 10;
 
 var IRON_MAN_MAX_ROTATIONS = 8;
-var IRON_MAN_ANGLE_STEP = 0.1;
+var IRON_MAN_ANGLE_STEP = 0.05;
 var BOOM_SPEED = 20;
 var BOOM_DURATION_CIRCLES = 100;
 var IRON_MAN_SPEED_X = 0.5;
@@ -33,10 +35,13 @@ var CLOUD_BOOM_SPEED = 40;
 
 var game_is_started = false;
 var MODELS_COUNT = 2;
-var WATER_SPEED = 5;
+var WATER_SPEED = 10;
+var WATER_PLANE_LENGTH = 10000;
+var WATER_PLANE_WIDTH = 10000;
 
 var camera_vibration_direction = 1;
-var CAMERA_VIBRATION_VALUE = 0.1;
+var CAMERA_VIBRATION_VALUE = 0.15;
+var CAMERA_POSITION_Y = 10;
 
 function render() {
   requestAnimationFrame( render );
@@ -54,10 +59,13 @@ function onWindowResize() {
 }
 
 function initialize_renderer() {
-
-  camera = new THREE.PerspectiveCamera( 10, window.innerWidth / window.innerHeight, 100, 1000000 );
+  camera = new THREE.PerspectiveCamera( 15, window.innerWidth / window.innerHeight, 100, 1000000 );
   camera.position.set( 0, 45, 155 );
-  camera.rotateX(-Math.PI / 14);
+  camera.rotateX(-Math.PI / 100);
+
+  // camera = new THREE.PerspectiveCamera( 10, window.innerWidth / window.innerHeight, 100, 1000000 );
+  // camera.position.set( 0, 45, 155 );
+  // camera.rotateX(-Math.PI / 14);
 
 
   // camera = new THREE.PerspectiveCamera( 10, window.innerWidth / window.innerHeight, 100, 1000000 );
@@ -140,10 +148,10 @@ $(document).keydown(function (e) {
     }
 
     if (keys[38] && !keys[40] || keys[38] && keys[40] && plane.speed_y > 0) {
-      direction_y = -1;
+      direction_y = 1;
     } else {
-      if (keys[38] && !keys[40] || keys[38] && keys[40] && plane.speed_y < 0)
-        direction_y = 1;
+      if (keys[40] && !keys[38] || keys[38] && keys[40] && plane.speed_y < 0)
+        direction_y = -1;
       else
         direction_y = 0; 
     }
@@ -169,7 +177,8 @@ function Plane (scene, camera) {
   this.speed_y = 0;
   this.reload_time = 0;
   this.bullets = [];
-  this.rotations = 0;
+  this.rotations_x = 0;
+  this.rotations_y = 0;
   this.exhaust = new Exhaust();
   this.initialize_mesh(scene);
   this.is_shooting = false;
@@ -206,30 +215,54 @@ Plane.prototype.shoot = function() {
 }
 
 Plane.prototype.update_position = function() {
-  this.speed_x = this.rotations * MAX_SPEED_X / PLANE_MAX_ROTATIONS;
+  this.speed_x = this.rotations_x * MAX_SPEED_X / PLANE_MAX_ROTATIONS;
+  this.speed_y = this.rotations_y * MAX_SPEED_Y / PLANE_MAX_ROTATIONS;
+
   if (Math.abs(this.mesh.position.x) < BORDER_X || this.direction_x != sign(this.mesh.position.x)) {
     this.mesh.position.x += this.speed_x;
     this.camera.position.x += this.speed_x / 2;
-    this.exhaust.plane_move(this.mesh.position, this.rotations);
   } else {
     this.mesh.position.x = sign(this.mesh.position.x) * BORDER_X;
     this.camera.position.x = sign(this.mesh.position.x) * BORDER_X / 2;
     this.direction_x = 0;
   }
 
+  if (Math.abs(this.mesh.position.y) < BORDER_Y || this.direction_y != sign(this.mesh.position.y)) {
+    this.mesh.position.y += this.speed_y;
+    this.camera.position.y += this.speed_y;
+  } else {
+    this.mesh.position.y = sign(this.mesh.position.y) * BORDER_Y;
+    this.camera.position.y = this.mesh.position.y;
+    this.direction_y = 0;
+  }
+
+  this.camera.position.y = this.mesh.position.y + CAMERA_POSITION_Y;
+  this.exhaust.plane_move(this.mesh.position, this.rotations_x, this.rotations_y);
   this.rotate();
 }
 
 Plane.prototype.rotate = function() {
   if (this.direction_x != 0) {
-    if (Math.abs(this.rotations) < PLANE_MAX_ROTATIONS || this.direction_x != sign(this.rotations)) {
-      this.rotations += this.direction_x;
-      this.mesh.rotateY(PLANE_ANGLE_STEP * this.direction_x);
+    if (Math.abs(this.rotations_x) < PLANE_MAX_ROTATIONS || this.direction_x != sign(this.rotations_x)) {
+      this.rotations_x += this.direction_x;
+      this.mesh.rotation.y += PLANE_ANGLE_STEP_X * this.direction_x;
     }
   } else {
-    if (this.rotations != 0) {
-      this.mesh.rotateY(-sign(this.rotations) * PLANE_ANGLE_STEP);
-      this.rotations += -sign(this.rotations);
+    if (this.rotations_x != 0) {
+      this.mesh.rotation.y -= sign(this.rotations_x) * PLANE_ANGLE_STEP_X;
+      this.rotations_x += -sign(this.rotations_x);
+    }
+  }
+
+  if (this.direction_y != 0) {
+    if (Math.abs(this.rotations_y) < PLANE_MAX_ROTATIONS || this.direction_y != sign(this.rotations_y)) {
+      this.rotations_y += this.direction_y;
+      this.mesh.rotation.x += PLANE_ANGLE_STEP_Y * this.direction_y;
+    }
+  } else {
+    if (this.rotations_y != 0) {
+      this.mesh.rotation.x -= sign(this.rotations_y) * PLANE_ANGLE_STEP_Y;
+      this.rotations_y += -sign(this.rotations_y);
     }
   }
 }
@@ -267,15 +300,20 @@ function Exhaust() {
   this.meshes_array = this.initialize_mesh(-0.8, -0.1, 9);
 }
 
-Exhaust.prototype.plane_move = function(parent_position, rotation) {
+Exhaust.prototype.plane_move = function(parent_position, rotation_x, rotation_y) {
   for (var i = 0; i < this.meshes_array.length; i++) {
     this.meshes_array[i].position.z = parent_position.z + 9;
     i == 0 ? this.meshes_array[i].position.x = parent_position.x - 0.8 : this.meshes_array[i].position.x = parent_position.x + 0.8;
 
-    if (rotation != 0) {
-      i == 0 ? this.meshes_array[i].position.y = parent_position.y + 0.037 * rotation : this.meshes_array[i].position.y = parent_position.y - 0.037 * rotation;
+    if (rotation_x != 0) {
+      i == 0 ? this.meshes_array[i].position.y = parent_position.y + 0.02 * rotation_x : this.meshes_array[i].position.y = parent_position.y - 0.02 * rotation_x;
     } else {
       this.meshes_array[i].position.y = parent_position.y - 0.1;
+    }
+
+    if (rotation_y != 0) {
+      this.meshes_array[i].position.y = this.meshes_array[i].position.y - rotation_y / PLANE_MAX_ROTATIONS;
+      this.emitter.acceleration.set(0, -170, -rotation_y);
     }
   }
 
@@ -291,7 +329,7 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
         blending: THREE.AdditiveBlending,
     });
 
-    emitter = new SPE.Emitter({
+    this.emitter = new SPE.Emitter({
         type : 'sphere',
         position: new THREE.Vector3(0, 0, 0),
         positionSpread: new THREE.Vector3( 0, 0, 0 ),
@@ -315,7 +353,7 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
 
     this.particleGroup.mesh.rotateX(-Math.PI / 2);
     this.particleGroup.mesh.position.set(pos_x, pos_y, pos_z);
-    this.particleGroup.addEmitter( emitter );
+    this.particleGroup.addEmitter( this.emitter );
 
     scene.add( this.particleGroup.mesh );
 
@@ -332,7 +370,7 @@ function IronMan (scene) {
   this.initialize_mesh();
   this.initialize_explosion_mesh();
   this.boom_duration = 0;
-  this.rotations = 0;
+  this.rotations_x = 0;
 }
 
 IronMan.prototype.initialize_mesh = function() {
@@ -342,7 +380,7 @@ IronMan.prototype.initialize_mesh = function() {
   loader.load('models/Mark_42.obj', 'models/Mark_42.mtl',
     function ( object ) {
       iron_man.mesh = object;
-      iron_man.mesh.rotateX(-Math.PI /2 + 0.2);
+      iron_man.mesh.rotateX(-Math.PI /2 + 0.1);
       iron_man.mesh.rotateY(Math.PI);
       iron_man.mesh.position.z = -130;
       iron_man.mesh.scale.set(3, 3, 3);
@@ -425,7 +463,7 @@ IronMan.prototype.choose_direction = function(bullets) {
 IronMan.prototype.move = function(bullets) {
   if (this.boom_duration > 0) return;
   this.choose_direction(bullets);
-  this.speed_x = this.rotations * IRON_MAN_SPEED_X / IRON_MAN_MAX_ROTATIONS;
+  this.speed_x = this.rotations_x * IRON_MAN_SPEED_X / IRON_MAN_MAX_ROTATIONS;
 
 
   if (Math.abs(this.mesh.position.x) < BORDER_X || this.direction_x != sign(this.mesh.position.x)) {
@@ -440,21 +478,21 @@ IronMan.prototype.move = function(bullets) {
 
 IronMan.prototype.rotate = function() {
   if (this.direction_x != 0) {
-    if (Math.abs(this.rotations) < IRON_MAN_MAX_ROTATIONS || sign(this.rotations) != this.direction_x) {
-      this.rotations += this.direction_x;
+    if (Math.abs(this.rotations_x) < IRON_MAN_MAX_ROTATIONS || sign(this.rotations_x) != this.direction_x) {
+      this.rotations_x += this.direction_x;
       this.mesh.rotateY(IRON_MAN_ANGLE_STEP * this.direction_x);
     }
   } else {
-    if (this.rotations != 0) {
-      this.mesh.rotateY(-sign(this.rotations) * IRON_MAN_ANGLE_STEP);
-      this.rotations += -sign(this.rotations);
+    if (this.rotations_x != 0) {
+      this.mesh.rotateY(-sign(this.rotations_x) * IRON_MAN_ANGLE_STEP);
+      this.rotations_x += -sign(this.rotations_x);
     }
   }
 }
 
 
 function Enviroment(scene, directional_light) {
-  this.water_array = [new Water(-500, scene, directional_light), new Water(-1500, scene, directional_light)];
+  this.water_array = [new Water(-WATER_PLANE_LENGTH / 2, scene, directional_light), new Water(-WATER_PLANE_LENGTH * 1.5, scene, directional_light)];
   this.skybox = new SkyBox(scene);
 }
 
@@ -470,11 +508,11 @@ function Water(pos_z, scene, directional_light) {
 Water.prototype.move = function() {
   this.water_controller.material.uniforms.time.value += 1.0 / 60.0;
   this.water_controller.render();
-  if (this.mesh.position.z == 500) this.mesh.position.z = -1500;
+  if (this.mesh.position.z == WATER_PLANE_LENGTH / 2) this.mesh.position.z = -WATER_PLANE_LENGTH * 1.5;
   this.mesh.position.z += WATER_SPEED;
 }
 Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
-  var plane = new THREE.BufferGeometry().fromGeometry(new THREE.PlaneGeometry( 1000, 1200));
+  var plane = new THREE.BufferGeometry().fromGeometry(new THREE.PlaneGeometry( WATER_PLANE_LENGTH, WATER_PLANE_WIDTH));
 
 
   var water_normals = THREE.ImageUtils.loadTexture( 'models/ocean.jpg' );
@@ -489,13 +527,12 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
       sunColor: 0xffffff,
       waterColor: 0x001FFf,
       distortionScale: 80.0,
-      side: THREE.DoubleSide
   });
 
   var water_mesh = new THREE.Mesh(plane, this.water_controller.material);
 
   water_mesh.rotateZ(Math.PI / 2);
-  water_mesh.position.y = -15;
+  water_mesh.position.y = -115;
   water_mesh.position.z = pos_z;
 
   water_mesh.add(this.water_controller);
