@@ -8,7 +8,7 @@ $(document).on('ready', function() {
 var WIDTH = window.innerWidth - 20;
 var HEIGHT = window.innerHeight - 20;
 var BORDER_X = 60;
-var BORDER_Y = 100;
+var BORDER_Y = 50;
 var FRONT_BORDER_Z = -170;
 var PLANE_MAX_ROTATIONS = 20;
 var PLANE_ANGLE_STEP_X = 0.02;
@@ -17,16 +17,18 @@ var MAX_SPEED_X = 0.5;
 var MAX_SPEED_Y = 0.5;
 var SPEED_UP_STEP = 5;
 var SPEED_DOWN_STEP = 1;
+var BULLET_BORDER_Z = -250;
 var BULLET_SPEED_Y = 10;
 var BULLET_SPEED_Z = 8;
 var BULLET_OFFSET = 2;
+var BULLETS_MAX_COUNT = 10;
 var RELOAD_TIME = 10;
 var PLANE_EXPLOISON_CIRCLES = 100;
 
 var IRON_MAN_MAX_ROTATIONS = 8;
 var IRON_MAN_ANGLE_STEP = 0.05;
 var BOOM_SPEED = 20;
-var BOOM_DURATION_CIRCLES = 100;
+var IRON_MAN_EXPLOISON_CIRCLES = 100;
 var IRON_MAN_SPEED_X = 0.5;
 var IRON_MAN_RADAR_RADIUS = 10;
 
@@ -56,7 +58,6 @@ function onWindowResize() {
     camera.aspect = WIDTH / HEIGHT;
     camera.updateProjectionMatrix();
     renderer.setSize( WIDTH, HEIGHT );
-
 }
 
 function initialize_renderer() {
@@ -111,8 +112,7 @@ function start() {
 
 function move_objects() {
   plane.move();
-  iron_man.check_collision(plane.bullets);
-  iron_man.move(plane.bullets);
+  plane.bullets_container.check_collision(iron_man) ? iron_man.explosion() : iron_man.move(plane.bullets_container);
   enviroment.move();
   camera_vibration();
 }
@@ -160,15 +160,15 @@ $(document).keydown(function (e) {
     plane.start_move(direction_x, direction_y);
     if (keys[32])
       plane.is_shooting = true;
-    previous_keys = keys;
 });
 
 $(document).keyup(function (e) {
     delete keys[e.which];
     if (!keys[37] && !keys[38] && !keys[39] && !keys[40])
       plane.stop_move();
-    if (!keys[32])
+    if (!keys[32]) {
       plane.is_shooting = false;
+    }
 });
 
 function Plane (scene, camera) {
@@ -177,7 +177,7 @@ function Plane (scene, camera) {
   this.speed_x = 0;
   this.speed_y = 0;
   this.reload_time = 0;
-  this.bullets = [];
+  this.bullets_container = new BulletsContainer();
   this.rotations_x = 0;
   this.rotations_y = 0;
   this.exhaust = new Exhaust();
@@ -198,7 +198,7 @@ Plane.prototype.move = function() {
   this.reload();
   this.shoot();
   this.update_position();
-  this.update_bullets_position();
+  this.bullets_container.move(this.mesh.position, this.is_shooting);
 }
 
 Plane.prototype.reload = function() {
@@ -218,8 +218,7 @@ Plane.prototype.stop_move = function() {
 Plane.prototype.shoot = function() {
   if (this.reload_time > 0 || this.is_shooting == false) return;
   this.reload_time = RELOAD_TIME;
-  this.bullets.push(new Bullet(this.scene, this.mesh.position, 0.5));
-  this.bullets.push(new Bullet(this.scene, this.mesh.position, -0.5));
+  this.bullets_container.add(this.mesh.position);
 }
 
 Plane.prototype.update_position = function() {
@@ -294,15 +293,6 @@ Plane.prototype.initialize_mesh = function(scene) {
   );
 }
 
-Plane.prototype.update_bullets_position = function() {
-  for (var i = 0; i < this.bullets.length; i++) {
-    if (this.bullets[i].move() == false) {
-      this.bullets.splice(i,1);
-      i--;
-    }
-  }
-}
-
 Plane.prototype.explosion = function() {
   this.exploison_circles += 1;
   if (this.exploison_circles == 1) {
@@ -312,6 +302,8 @@ Plane.prototype.explosion = function() {
 
     for (var  i = 0; i < this.mesh.children.length; i++)
       this.explosion_rotations[i] = new THREE.Euler(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
+
+    this.explosion_mesh = new Exploison(this.mesh.position.clone(), PLANE_EXPLOISON_CIRCLES, 'red');
   }
 
   for (var i = 0; i < this.mesh.children.length; i++) {
@@ -323,31 +315,17 @@ Plane.prototype.explosion = function() {
     this.mesh.children[i].rotation.z += this.explosion_rotations[i].z;
   }
 
+  this.explosion_mesh.update();
+
   if (this.exploison_circles > PLANE_EXPLOISON_CIRCLES) {
     this.exploison_circles = 0;
     this.cancel_exploison();
     this.explosion_vertices = [];
     this,explosion_rotations = [];
     this.exhaust_visible_change(true);
+    this.explosion_mesh.remove();
+    delete this.explosion_mesh;
   }
-  //     positionStyle  : Type.SPHERE,
-  //   positionBase   : new THREE.Vector3( 0, 50, 0 ),
-  //   positionRadius : 2,
-        
-  //   velocityStyle : Type.SPHERE,
-  //   speedBase     : 40,
-  //   speedSpread   : 8,
-    
-  //   particleTexture : THREE.ImageUtils.loadTexture( 'images/smokeparticle.png' ),
-
-  //   sizeTween    : new Tween( [0, 0.1], [1, 150] ),
-  //   opacityTween : new Tween( [0.7, 1], [1, 0] ),
-  //   colorBase    : new THREE.Vector3(0.02, 1, 0.4),
-  //   blendStyle   : THREE.AdditiveBlending,  
-    
-  //   particlesPerSecond : 60,
-  //   particleDeathAge   : 1.5,   
-  //   emitterDeathAge    : 60
 }
 
 Plane.prototype.cancel_exploison = function() {
@@ -432,13 +410,67 @@ Exhaust.prototype.initialize_mesh = function (pos_x, pos_y, pos_z) {
     return [this.particleGroup.mesh, particleGroup1];
 }
 
+function Exploison(position, explosion_circles, color) {
+  this.scaler = 1;
+  this.initialize_mesh(position, color);
+}
+
+
+Exploison.prototype.update = function() {
+  this.particleGroup.mesh.scale.set(this.scaler, this.scaler, this.scaler);
+  this.particleGroup.tick();
+  this.scaler += 0.2;
+}
+
+Exploison.prototype.initialize_mesh = function (position, color) {
+    this.particleGroup = new SPE.Group({
+        texture: THREE.ImageUtils.loadTexture('models/smokeparticle.png'),
+        maxAge: 2,
+        depthTest: true,
+        fixedTimeStep: 0.016, 
+        blending: THREE.AdditiveBlending,
+    });
+
+    this.emitter = new SPE.Emitter({
+        type : 'sphere',
+        position: new THREE.Vector3(0, 0, 0),
+        positionSpread: new THREE.Vector3( 0, 0, 0 ),
+
+        acceleration: new THREE.Vector3(0, 0, 0),
+        accelerationSpread: new THREE.Vector3( 11, 1, 11 ),
+
+        velocity: new THREE.Vector3(5, 5, 5),
+        velocitySpread: new THREE.Vector3(10, 7.5, 10),
+
+        colorStart: new THREE.Color(color),
+        colorMiddle: new THREE.Color( 0xff5a00 ),
+        colorEnd: new THREE.Color('white'),
+
+        sizeStart: 100,
+        sizeEnd: 1000,
+
+        particleCount: 1000,
+        alive: 0.5,
+        radius: 1,
+    });
+
+    this.particleGroup.mesh.position.set(position.x, position.y, position.z);
+    this.particleGroup.addEmitter( this.emitter );
+
+    scene.add( this.particleGroup.mesh );
+}
+
+Exploison.prototype.remove = function(scaler) {
+  scene.remove( this.particleGroup.mesh);
+}
+
 
 function IronMan (scene) {
   this.direction_x = 0;
   this.scene = scene;
   this.initialize_mesh();
   this.initialize_explosion_mesh();
-  this.boom_duration = 0;
+  this.exploison_circles = 0;
   this.rotations_x = 0;
 }
 
@@ -465,40 +497,26 @@ IronMan.prototype.initialize_explosion_mesh = function() {
   );
 }
 
-IronMan.prototype.check_collision = function(bullets) {
-  if (this.boom_duration != 0) {
-    this.explosion();
-    return;
-  }
-  for (var i = 0; i < bullets.length; i++) {
-    if (bullets[i].mesh.position.x <= this.mesh.position.x + 3 &&
-        bullets[i].mesh.position.x >= this.mesh.position.x - 3 &&
-        bullets[i].mesh.position.z > FRONT_BORDER_Z &&
-        bullets[i].mesh.position.z < FRONT_BORDER_Z + 6) 
-      this.boom_duration = 1;
-  }
-}
-
 IronMan.prototype.explosion = function() {
-  if (this.boom_duration == 0) return;
-  this.explosion_mesh.position.set(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z);
-  this.explosion_mesh.scale.set(this.boom_duration, this.boom_duration, this.boom_duration);
-
-  if (this.boom_duration == 1) {
-    this.scene.add(this.explosion_mesh);
+  if (this.exploison_circles == 0) {
+    this.exploison_circles = 1;
+    this.explosion_mesh = new Exploison(this.mesh.position.clone(), IRON_MAN_EXPLOISON_CIRCLES, 'blue');
   }
 
-  if (this.boom_duration > BOOM_DURATION_CIRCLES) {
-    this.boom_duration = 0;
-    this.scene.remove(this.explosion_mesh);
+  if (this.exploison_circles > IRON_MAN_EXPLOISON_CIRCLES) {
+    this.exploison_circles = 0;
+    this.explosion_mesh.remove();
+    delete this.explosion_mesh;
     return;
   }
 
-  this.boom_duration += 1;
+  this.explosion_mesh.update();
+  this.exploison_circles += 1;
 }
 
 
-IronMan.prototype.choose_direction = function(bullets) {
+IronMan.prototype.choose_direction = function(bullets_container) {
+  var bullets = bullets_container.bullets;
   var collision_is_near = false, clothest_bullets = [], direction = 0;
 
   for (var i = 0; i < bullets.length; i++) {
@@ -530,7 +548,7 @@ IronMan.prototype.choose_direction = function(bullets) {
 }
 
 IronMan.prototype.move = function(bullets) {
-  if (this.boom_duration > 0) return;
+  if (this.exploison_circles > 0) return;
   this.choose_direction(bullets);
   this.speed_x = this.rotations_x * IRON_MAN_SPEED_X / IRON_MAN_MAX_ROTATIONS;
 
@@ -580,6 +598,7 @@ Water.prototype.move = function() {
   if (this.mesh.position.z == WATER_PLANE_LENGTH / 2) this.mesh.position.z = -WATER_PLANE_LENGTH * 1.5;
   this.mesh.position.z += WATER_SPEED;
 }
+
 Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
   var plane = new THREE.BufferGeometry().fromGeometry(new THREE.PlaneGeometry( WATER_PLANE_LENGTH, WATER_PLANE_WIDTH));
 
@@ -601,7 +620,7 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
   var water_mesh = new THREE.Mesh(plane, this.water_controller.material);
 
   water_mesh.rotateZ(Math.PI / 2);
-  water_mesh.position.y = -115;
+  water_mesh.position.y = - BORDER_Y - 10;
   water_mesh.position.z = pos_z;
 
   water_mesh.add(this.water_controller);
@@ -647,28 +666,75 @@ SkyBox.prototype.initialize_mesh = function(scene) {
   sky.uniforms.sunPosition.value.copy( sunSphere.position );
 }
 
-function Bullet(scene, pos_vector, side) {
-  this.initialize_mesh(scene, pos_vector, side);
-  this.exhaust = new Exhaust();
-  this.scene = scene;
+function BulletsContainer() {
+  this.initialize_mesh();
+  this.bullets = [];
 }
 
-Bullet.prototype.initialize_mesh = function(scene, pos_vector, side) {
+BulletsContainer.prototype.initialize_mesh = function(scene) {
   this.mesh = new THREE.Mesh(new THREE.BoxGeometry( 0.1, 0.1, 5 ),
     new THREE.MeshBasicMaterial( { color: 0xFFFF00 })
   );
+}
 
-  this.mesh.position.set(pos_vector.x + side * BULLET_OFFSET, pos_vector.y, 0);
+BulletsContainer.prototype.add = function(parent_position) {
+  if (this.bullets.length < BULLETS_MAX_COUNT) {
+    this.bullets.push(new Bullet(this.mesh, parent_position, 0.5));
+    this.bullets.push(new Bullet(this.mesh, parent_position, -0.5));
+  } else {
+    this.move(parent_position, true);
+  }
+}
+
+BulletsContainer.prototype.move = function(parent_position, is_shooting) {
+  for (var i = 0; i < this.bullets.length; i++) {
+    if (this.bullets[i].move() == false) {
+      if (is_shooting) {
+        this.bullets[i].move_to(parent_position);
+      } else {
+        scene.remove(this.bullets[i].mesh);
+        delete this.bullets[i];
+        this.bullets.splice(i,1);
+        i--;
+      }
+    }
+  }
+}
+
+BulletsContainer.prototype.check_collision = function(iron_man) {
+  if (iron_man.exploison_circles != 0) return true;
+  for (var i = 0; i < this.bullets.length; i++) {
+    if (this.bullets[i].mesh.position.x <= iron_man.mesh.position.x + 3 &&
+        this.bullets[i].mesh.position.x >= iron_man.mesh.position.x - 3 &&
+        this.bullets[i].mesh.position.z > FRONT_BORDER_Z &&
+        this.bullets[i].mesh.position.z < FRONT_BORDER_Z + 6)
+      return true;
+  }
+  return false;
+}
+
+function Bullet(mesh, pos_vector, side) {
+  this.initialize_mesh(mesh, pos_vector, side);
+  this.exhaust = new Exhaust();
+}
+
+Bullet.prototype.initialize_mesh = function(mesh, parent_position, side) {
+  this.side = side;
+  this.mesh = mesh.clone();
+  this.mesh.position.set(parent_position.x + side * BULLET_OFFSET, parent_position.y, 0);
   scene.add( this.mesh );
 }
 
 Bullet.prototype.move = function() {
   this.mesh.position.z -= BULLET_SPEED_Z;
-  if (this.mesh.position.z < FRONT_BORDER_Z) {
-    this.scene.remove(this.mesh)
+  if (this.mesh.position.z < BULLET_BORDER_Z) {
     return false;
   }
   return true;
+}
+
+Bullet.prototype.move_to = function(position) {
+  this.mesh.position.set(position.x + this.side * BULLET_OFFSET, position.y, position.z);
 }
 
 function sign(number) {
