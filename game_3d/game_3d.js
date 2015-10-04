@@ -134,7 +134,7 @@ function start() {
 }
 
 function move_objects() {
-  plane.move(enviroment.terrains);
+  plane.move(terrains_in_game_area);
   plane.bullets_container.check_collision(iron_man) ? iron_man.explosion() : iron_man.move(plane.bullets_container);
   enviroment.move();
   camera_vibration();
@@ -209,11 +209,10 @@ Terrain.prototype.initialize_mesh = function(position_x, position_z) {
     height: 200 + Math.random() * 100,
     widthSegments: 20,
     heightSegments: 20,
-    depth: 50 + BORDER_Y * Math.random() * 5,
+    depth: 50 + BORDER_Y * Math.random() * 8,
     param: 4,
     filterparam: 1,
     filter: [ CIRCLE_FILTER ],
-    postgen: [ MOUNTAINS_COLORS ],
     effect: [ DESTRUCTURE_EFFECT ]
   };
 
@@ -239,6 +238,7 @@ Terrain.prototype.move = function() {
 }
 
 function Plane (scene, camera) {
+  this.meshes_array;
   this.camera = camera;
   this.scene = scene;
   this.speed_x = 0;
@@ -257,11 +257,12 @@ function Plane (scene, camera) {
   this.explosion_rotations = [];
 }
 
-Plane.prototype.move = function() {
-  if (this.exploison_circles != 0) {
+Plane.prototype.move = function(terrains) {
+  if (this.exploison_circles != 0 || this.check_collision(terrains)) {
     this.explosion();
     return;
   }
+
   this.reload();
   this.shoot();
   this.update_position();
@@ -313,6 +314,7 @@ Plane.prototype.update_position = function() {
   this.camera.position.y = this.mesh.position.y + CAMERA_POSITION_Y;
   this.exhaust.plane_move(this.mesh.position, this.rotations_x, this.rotations_y);
   this.rotate();
+  this.collision.position.set(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z);
 }
 
 Plane.prototype.rotate = function() {
@@ -339,12 +341,13 @@ Plane.prototype.rotate = function() {
       this.rotations_y += -sign(this.rotations_y);
     }
   }
+  this.collision.rotation.z = - this.rotations_x * PLANE_ANGLE_STEP_X;
 }
 
 Plane.prototype.initialize_mesh = function(scene) {
-    var loader = new THREE.OBJMTLLoader();
-    var plane = this;
-    loader.load('models/Su-47_Berkut.obj', 'models/Su-47_Berkut.mtl',
+  var loader = new THREE.OBJMTLLoader();
+  var plane = this;
+  loader.load('models/Su-47_Berkut.obj', 'models/Su-47_Berkut.mtl',
     function ( object ) {
       object.rotateX(-Math.PI / 2);
       plane.mesh = object;
@@ -357,7 +360,11 @@ Plane.prototype.initialize_mesh = function(scene) {
     function ( xhr ) {
       console.log( 'An error happened' );
     }
+    );
+  this.collision = new THREE.Mesh( new THREE.SphereGeometry( 8, 4, 4 ) ,
+    new THREE.MeshBasicMaterial( { color: 0x00aaff } )
   );
+  this.collision.scale.set(1,0.16,1.5);
 }
 
 Plane.prototype.explosion = function() {
@@ -410,7 +417,31 @@ Plane.prototype.exhaust_visible_change = function(visible) {
 }
 
 Plane.prototype.check_collision = function(terrains) {
+  var collidableMeshList = [];
+  var distance;
+  for (var i = 0; i < terrains.length; i++) {
+    if (Math.abs(terrains[i].mesh.position.length() - this.mesh.position.length()) < 120)
+      collidableMeshList.push(terrains[i].mesh);
+  }
 
+  if (collidableMeshList.length > 0)
+    for (var vertexIndex = 0; vertexIndex < this.collision.geometry.vertices.length; vertexIndex++) {       
+      var localVertex = this.collision.geometry.vertices[vertexIndex].clone();
+      var globalVertex = localVertex.applyMatrix4(this.collision.matrix);
+      var directionVector = globalVertex.subVectors(globalVertex, this.collision.position);
+
+      var ray = new THREE.Raycaster( this.collision.position, directionVector.clone().normalize() );
+      var collisionResults = ray.intersectObjects( collidableMeshList );
+      if ( collisionResults.length > 0) {
+        if (collisionResults[0].distance < directionVector.length() * 2) { 
+          console.log('BOOOM');
+          return true;
+        }
+      }
+    }
+
+  delete collidableMeshList;
+  return false;
 }
 
 
