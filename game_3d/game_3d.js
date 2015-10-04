@@ -26,10 +26,12 @@ var RELOAD_TIME = 10;
 var PLANE_EXPLOISON_CIRCLES = 100;
 
 var IRON_MAN_MAX_ROTATIONS = 8;
-var IRON_MAN_ANGLE_STEP = 0.05;
+var IRON_MAN_ANGLE_STEP_X = 0.05;
+var IRON_MAN_ANGLE_STEP_Y = 0.005;
 var BOOM_SPEED = 20;
 var IRON_MAN_EXPLOISON_CIRCLES = 100;
-var IRON_MAN_SPEED_X = 0.5;
+var IRON_MAN_SPEED_X = 0.3;
+var IRON_MAN_SPEED_Y = 0.2;
 var IRON_MAN_RADAR_RADIUS = 10;
 
 var CLOUD_SPEED_X = 1;
@@ -106,24 +108,8 @@ function initialize_objects() {
   plane = new Plane(scene, camera);
   iron_man = new IronMan(scene);
   enviroment = new Enviroment(scene, directional_light);
-  enviroment.add(new Water(-WATER_PLANE_LENGTH / 2, scene, directional_light));
-  enviroment.add(new Water(-WATER_PLANE_LENGTH * 1.5, scene, directional_light));
-
-  terrains_in_game_area = [];
-  for (var i = 0; i < TERRAINS_COUNT / 2; i++) {
-    var position_x = BORDER_X * (1 - 2 * Math.random()) * 8;
-    var position_z = - TERRAINS_INTERVAL * (i+1) - Math.random() * TERRAINS_INTERVAL / 2;
-    terrains_in_game_area.push(new Terrain(position_x, position_z, true));
-  }
-  enviroment.objects = enviroment.objects.concat(terrains_in_game_area);
-
-  var side = 0;
-  for (var i = 0; i < TERRAINS_COUNT / 2; i++) {
-    i % 2 == 0 ? side = 1 : side = -1;
-    var position_x = side * 30 * BORDER_X * (1 + Math.random());
-    var position_z = - TERRAINS_INTERVAL * (i+1) - Math.random() * TERRAINS_INTERVAL / 2;
-    enviroment.add(new Terrain(position_x, position_z, false));
-  }
+  terrains_container = new TerrainsContainer();
+  enviroment.add(terrains_container);
 }
 
 function start() {
@@ -134,8 +120,8 @@ function start() {
 }
 
 function move_objects() {
-  plane.move(terrains_in_game_area);
-  plane.bullets_container.check_collision(iron_man) ? iron_man.explosion() : iron_man.move(plane.bullets_container);
+  plane.move(terrains_container);
+  iron_man.move(plane.bullets_container, terrains_container);
   enviroment.move();
   camera_vibration();
 }
@@ -194,6 +180,60 @@ $(document).keyup(function (e) {
     }
 });
 
+function TerrainsContainer() {
+  this.in_enviroment = [];
+  this.in_game_area = [];
+  this.generate();
+}
+
+TerrainsContainer.prototype.generate = function() {
+  var position_x, position_y;
+  for (var i = 0; i < TERRAINS_COUNT / 2; i++) {
+    position_x = BORDER_X * (1 - 2 * Math.random()) * 8;
+    position_z = - TERRAINS_INTERVAL * (i+1) - Math.random() * TERRAINS_INTERVAL / 2;
+    this.in_game_area.push(new Terrain(position_x, position_z, true));
+  }
+
+  var side = 0;
+  for (var i = 0; i < TERRAINS_COUNT / 2; i++) {
+    i % 2 == 0 ? side = 1 : side = -1;
+    position_x = side * 30 * BORDER_X * (1 + Math.random());
+    position_z = - TERRAINS_INTERVAL * (i+1) - Math.random() * TERRAINS_INTERVAL / 2;
+    this.in_enviroment.push(new Terrain(position_x, position_z, false));
+  }
+}
+
+TerrainsContainer.prototype.move = function() {
+  for (var i = 0; i < this.in_enviroment.length; i++)
+    this.in_enviroment[i].move();
+  for (var i = 0; i < this.in_game_area.length; i++)
+    this.in_game_area[i].move();
+}
+
+TerrainsContainer.prototype.collision_detected = function(mesh) {
+  var collidable_mesh_list = [], local_vertex, global_vertex, direction_vector;
+  for (var i = 0; i < this.in_game_area.length; i++) {
+    if (Math.abs(this.in_game_area[i].mesh.position.length() - mesh.position.length()) < 220)
+      collidable_mesh_list.push(this.in_game_area[i].mesh);
+  }
+
+  if (collidable_mesh_list.length > 0)
+    for (var i = 0; i < mesh.geometry.vertices.length; i++) {       
+      var local_vertex = mesh.geometry.vertices[i].clone();
+      var global_vertex = local_vertex.applyMatrix4(mesh.matrix);
+      var direction_vector = global_vertex.subVectors(global_vertex, mesh.position);
+
+      var ray_caster = new THREE.Raycaster( mesh.position, direction_vector.clone().normalize() );
+      var results = ray_caster.intersectObjects( collidable_mesh_list );
+      if ( results.length > 0 && results[0].distance < direction_vector.length()) {
+        return true;
+      }
+    }
+
+  delete collidable_mesh_list;
+  return false;
+}
+
 
 function Terrain(position_x, position_z, in_game_area) {
   this.in_game_area = in_game_area;
@@ -205,8 +245,8 @@ Terrain.prototype.initialize_mesh = function(position_x, position_z) {
   var parameters = {
     alea: RAND_MT,
     generator: PN_GENERATOR,
-    width: 200,
-    height: 200 + Math.random() * 100,
+    width: 100 + Math.random() * 50,
+    height: 100 + Math.random() * 100,
     widthSegments: 20,
     heightSegments: 20,
     depth: 50 + BORDER_Y * Math.random() * 8,
@@ -258,7 +298,7 @@ function Plane (scene, camera) {
 }
 
 Plane.prototype.move = function(terrains) {
-  if (this.exploison_circles != 0 || this.check_collision(terrains)) {
+  if (this.exploison_circles != 0 || this.collision_detected(terrains)) {
     this.explosion();
     return;
   }
@@ -416,34 +456,12 @@ Plane.prototype.exhaust_visible_change = function(visible) {
     this.exhaust.meshes_array[i].visible = visible;
 }
 
-Plane.prototype.check_collision = function(terrains) {
-  var collidableMeshList = [];
-  var distance;
-  for (var i = 0; i < terrains.length; i++) {
-    if (Math.abs(terrains[i].mesh.position.length() - this.mesh.position.length()) < 120)
-      collidableMeshList.push(terrains[i].mesh);
-  }
-
-  if (collidableMeshList.length > 0)
-    for (var vertexIndex = 0; vertexIndex < this.collision.geometry.vertices.length; vertexIndex++) {       
-      var localVertex = this.collision.geometry.vertices[vertexIndex].clone();
-      var globalVertex = localVertex.applyMatrix4(this.collision.matrix);
-      var directionVector = globalVertex.subVectors(globalVertex, this.collision.position);
-
-      var ray = new THREE.Raycaster( this.collision.position, directionVector.clone().normalize() );
-      var collisionResults = ray.intersectObjects( collidableMeshList );
-      if ( collisionResults.length > 0) {
-        if (collisionResults[0].distance < directionVector.length() * 2) { 
-          console.log('BOOOM');
-          return true;
-        }
-      }
-    }
-
-  delete collidableMeshList;
-  return false;
+Plane.prototype.collision_detected = function(terrains) {
+  if (terrains.collision_detected(this.collision))
+    return true;
+  else
+    return false;
 }
-
 
 function Exhaust() {
   this.meshes_array = this.initialize_mesh(-0.8, -0.1, 9);
@@ -569,11 +587,13 @@ Exploison.prototype.remove = function(scaler) {
 
 function IronMan (scene) {
   this.direction_x = 0;
+  this.direction_y = 0;
   this.scene = scene;
   this.initialize_mesh();
   this.initialize_explosion_mesh();
   this.exploison_circles = 0;
   this.rotations_x = 0;
+  this.rotations_y = 0;
   this.explosion_vertices = [];
   this.explosion_rotations = [];
 }
@@ -593,6 +613,13 @@ IronMan.prototype.initialize_mesh = function() {
       iron_man.ready = true;
     }
   );
+
+  this.collision = new THREE.Mesh( new THREE.SphereGeometry( 2, 4, 4 ) ,
+    new THREE.MeshBasicMaterial( { color: 0x00aaff } )
+  );
+  this.collision.scale.set(1.1,0.6,3);
+  this.collision.position.z = -134;
+  // scene.add(this.collision);
 }
 
 IronMan.prototype.initialize_explosion_mesh = function() {
@@ -644,13 +671,15 @@ IronMan.prototype.cancel_exploison = function() {
   }
 }
 
-IronMan.prototype.choose_direction = function(bullets_container) {
-  var bullets = bullets_container.bullets;
-  var collision_is_near = false, clothest_bullets = [], direction = 0;
+IronMan.prototype.choose_direction = function(bullets, terrains) {
+  var bullets = bullets.bullets;
+  var collision_is_near = false, clothest_bullets = [], direction_x = 0, direction_y = 0;
 
   for (var i = 0; i < bullets.length; i++) {
     if (bullets[i].mesh.position.x <= this.mesh.position.x + IRON_MAN_RADAR_RADIUS &&
-        bullets[i].mesh.position.x >= this.mesh.position.x - IRON_MAN_RADAR_RADIUS && 
+        bullets[i].mesh.position.x >= this.mesh.position.x - IRON_MAN_RADAR_RADIUS &&
+        bullets[i].mesh.position.y <= this.mesh.position.y + IRON_MAN_RADAR_RADIUS &&
+        bullets[i].mesh.position.y >= this.mesh.position.y - IRON_MAN_RADAR_RADIUS &&
         bullets[i].mesh.position.z > FRONT_BORDER_Z) {
       clothest_bullets.push(bullets[i])
       collision_is_near = true;
@@ -667,20 +696,27 @@ IronMan.prototype.choose_direction = function(bullets_container) {
         return 0;
     });
 
-    for (var i = 0; i < clothest_bullets.length; i++)
-      clothest_bullets[i].mesh.position.x <= this.mesh.position.x ? direction += 1 / (i + 1) : direction -= 1 / (i + 1);
+    for (var i = 0; i < clothest_bullets.length; i++) {
+      clothest_bullets[i].mesh.position.x <= this.mesh.position.x ? direction_x += 1 / (i + 1) : direction_x -= 1 / (i + 1);
+      clothest_bullets[i].mesh.position.y <= this.mesh.position.y ? direction_y += 1 / (i + 1) : direction_y -= 1 / (i + 1);
+    }
 
-    this.direction_x = sign(direction);
+    this.direction_x = sign(direction_x);
+    this.direction_y = sign(direction_y);
   } else {
     Math.abs(this.mesh.position.x) > IRON_MAN_SPEED_X + 1 ? this.direction_x = -sign(this.mesh.position.x) : this.direction_x = 0;
+    Math.abs(this.mesh.position.y) > IRON_MAN_SPEED_Y + 1 ? this.direction_y = -sign(this.mesh.position.y) : this.direction_y = 0;
   }
 }
 
-IronMan.prototype.move = function(bullets) {
-  if (this.exploison_circles > 0) return;
+IronMan.prototype.move = function(bullets, terrains) {
+  if (this.exploison_circles > 0 || this.collision_detected(bullets, terrains)) {
+    this.explosion();
+    return;
+  }
   this.choose_direction(bullets);
   this.speed_x = this.rotations_x * IRON_MAN_SPEED_X / IRON_MAN_MAX_ROTATIONS;
-
+  this.speed_y = this.rotations_y * IRON_MAN_SPEED_Y / IRON_MAN_MAX_ROTATIONS;
 
   if (Math.abs(this.mesh.position.x) < BORDER_X || this.direction_x != sign(this.mesh.position.x)) {
     this.mesh.position.x += this.speed_x;
@@ -689,28 +725,62 @@ IronMan.prototype.move = function(bullets) {
     this.direction_x = 0;
   }
 
+  if (Math.abs(this.mesh.position.y) < BORDER_Y || this.direction_y != sign(this.mesh.position.y)) {
+    this.mesh.position.y += this.speed_y;
+  } else {
+    this.mesh.position.y = sign(this.mesh.position.y) * BORDER_Y;
+    this.direction_y = 0;
+  }
+
   this.rotate();
+  this.collision.position.set(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z);
+}
+
+IronMan.prototype.collision_detected = function(bullets, terrains) {
+  if (bullets.collision_detected(this) || terrains.collision_detected(this.collision))
+    return true;
+  return false
 }
 
 IronMan.prototype.rotate = function() {
   if (this.direction_x != 0) {
-    if (Math.abs(this.rotations_x) < IRON_MAN_MAX_ROTATIONS || sign(this.rotations_x) != this.direction_x) {
+    if (Math.abs(this.rotations_x) < IRON_MAN_MAX_ROTATIONS || this.direction_x != sign(this.rotations_x)) {
       this.rotations_x += this.direction_x;
-      this.mesh.rotateY(IRON_MAN_ANGLE_STEP * this.direction_x);
+      this.mesh.rotation.y -= IRON_MAN_ANGLE_STEP_X * this.direction_x;
     }
   } else {
     if (this.rotations_x != 0) {
-      this.mesh.rotateY(-sign(this.rotations_x) * IRON_MAN_ANGLE_STEP);
+      this.mesh.rotation.y += sign(this.rotations_x) * IRON_MAN_ANGLE_STEP_X;
       this.rotations_x += -sign(this.rotations_x);
     }
   }
+
+  if (this.direction_y != 0) {
+    if (Math.abs(this.rotations_y) < IRON_MAN_MAX_ROTATIONS || this.direction_y != sign(this.rotations_y)) {
+      this.rotations_y += this.direction_y;
+      this.mesh.rotation.x += IRON_MAN_ANGLE_STEP_Y * this.direction_y;
+    }
+  } else {
+    if (this.rotations_y != 0) {
+      this.mesh.rotation.x -= sign(this.rotations_y) * IRON_MAN_ANGLE_STEP_Y;
+      this.rotations_y += -sign(this.rotations_y);
+    }
+  }
+
+  // this.collision.rotation.z = - this.rotations_x * IRON_MAN_ANGLE_STEP;
 }
 
 
 function Enviroment(scene, directional_light) {
   this.objects = [];
-  this.skybox = new SkyBox(scene);
+  this.initialize(scene, directional_light);
 }
+
+Enviroment.prototype.initialize = function(scene, directional_light) {
+  this.add(new Water(-WATER_PLANE_LENGTH / 2, scene, directional_light));
+  this.add(new Water(-WATER_PLANE_LENGTH * 1.5, scene, directional_light));
+  new SkyBox(scene);
+} 
 
 Enviroment.prototype.add = function(object) {
   this.objects.push(object);
@@ -738,6 +808,9 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
 
   var water_normals = THREE.ImageUtils.loadTexture( 'models/ocean.jpg' );
   water_normals.wrapS = water_normals.wrapT = THREE.RepeatWrapping;
+
+  var camera = new THREE.PerspectiveCamera( 15, window.innerWidth / window.innerHeight, 100, 1000000 );
+  camera.position.set( 0, 55, 155 );
 
   this.water_controller = new THREE.Water( renderer, camera, scene, {
     textureWidth: 128,
@@ -834,11 +907,13 @@ BulletsContainer.prototype.move = function(parent_position, is_shooting) {
   }
 }
 
-BulletsContainer.prototype.check_collision = function(iron_man) {
+BulletsContainer.prototype.collision_detected = function(iron_man) {
   if (iron_man.exploison_circles != 0) return true;
   for (var i = 0; i < this.bullets.length; i++) {
     if (this.bullets[i].mesh.position.x <= iron_man.mesh.position.x + 3 &&
         this.bullets[i].mesh.position.x >= iron_man.mesh.position.x - 3 &&
+        this.bullets[i].mesh.position.y <= iron_man.mesh.position.y + 1 &&
+        this.bullets[i].mesh.position.y >= iron_man.mesh.position.y - 1 &&
         this.bullets[i].mesh.position.z > FRONT_BORDER_Z &&
         this.bullets[i].mesh.position.z < FRONT_BORDER_Z + 6)
       return true;
