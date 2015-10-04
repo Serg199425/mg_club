@@ -33,6 +33,7 @@ var IRON_MAN_EXPLOISON_CIRCLES = 100;
 var IRON_MAN_SPEED_X = 0.3;
 var IRON_MAN_SPEED_Y = 0.2;
 var IRON_MAN_RADAR_RADIUS = 10;
+var IRON_MAN_TERRAINS_RADIUS = 2500;
 
 var CLOUD_SPEED_X = 1;
 var CLOUD_SPEED_Y = 20;
@@ -707,6 +708,14 @@ IronMan.prototype.choose_direction = function(bullets, terrains) {
     Math.abs(this.mesh.position.x) > IRON_MAN_SPEED_X + 1 ? this.direction_x = -sign(this.mesh.position.x) : this.direction_x = 0;
     Math.abs(this.mesh.position.y) > IRON_MAN_SPEED_Y + 1 ? this.direction_y = -sign(this.mesh.position.y) : this.direction_y = 0;
   }
+
+  for (var i = 0; i < terrains.in_game_area.length; i++) {
+    if (Math.abs(Math.abs(terrains.in_game_area[i].mesh.position.x) - Math.abs(this.mesh.position.x)) < BORDER_X &&
+        Math.abs(Math.abs(terrains.in_game_area[i].mesh.position.z) - Math.abs(this.mesh.position.z)) < IRON_MAN_TERRAINS_RADIUS) {
+      this.direction_x = -sign(terrains.in_game_area[i].mesh.position.x);
+      break;
+    }
+  }
 }
 
 IronMan.prototype.move = function(bullets, terrains) {
@@ -714,7 +723,7 @@ IronMan.prototype.move = function(bullets, terrains) {
     this.explosion();
     return;
   }
-  this.choose_direction(bullets);
+  this.choose_direction(bullets, terrains);
   this.speed_x = this.rotations_x * IRON_MAN_SPEED_X / IRON_MAN_MAX_ROTATIONS;
   this.speed_y = this.rotations_y * IRON_MAN_SPEED_Y / IRON_MAN_MAX_ROTATIONS;
 
@@ -835,6 +844,7 @@ Water.prototype.initialize_mesh = function(pos_z, scene, directional_light) {
 
   return water_mesh;
 }
+
 
 function SkyBox(scene) {
   this.initialize_mesh(scene);
