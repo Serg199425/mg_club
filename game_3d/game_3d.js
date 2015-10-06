@@ -8,6 +8,8 @@ function Game() {
   var scene, renderer, camera;
   var width = window.innerWidth - 20, height = window.innerHeight - 20;
   var game_is_started = false;
+
+  var iron_man, plane, enviroment, terrains_container;
   var camera_vibration_direction = 1;
   var BORDER_X = 60, BORDER_Y = 40;
   var FRONT_BORDER_Z = -170;
@@ -55,6 +57,14 @@ function Game() {
       move_interval = setInterval(move_objects, 10);
       game_is_started = true;
     }
+  }
+
+  this.destroy_plane = function() {
+    if (plane.ready) plane.explosion();
+  }
+
+  this.destroy_iron_man = function() {
+    if (iron_man.ready) iron_man.explosion();
   }
 
   function render() {
@@ -196,6 +206,8 @@ function Game() {
       position_z = - TERRAINS_INTERVAL * (i+1) - Math.random() * TERRAINS_INTERVAL / 2;
       this.in_enviroment.push(new Terrain(position_x, position_z, false));
     }
+
+    this.ready = true;
   }
 
   TerrainsContainer.prototype.move = function() {
@@ -304,6 +316,7 @@ function Game() {
     this.reload();
     this.shoot();
     this.update_position();
+    this.animate();
     this.bullets_container.move(this.mesh.position, this.is_shooting);
   }
 
@@ -350,9 +363,12 @@ function Game() {
     }
 
     this.camera.position.y = this.mesh.position.y + CAMERA_POSITION_Y;
-    this.exhaust.plane_move(this.mesh.position, this.rotations_x, this.rotations_y);
-    this.rotate();
     this.collision.position.setVector(this.mesh.position);
+  }
+
+  Plane.prototype.animate = function() {
+    this.exhaust.move(this.mesh.position, this.rotations_x, this.rotations_y, PLANE_MAX_ROTATIONS);
+    this.rotate();
   }
 
   Plane.prototype.rotate = function() {
@@ -383,16 +399,17 @@ function Game() {
   }
 
   Plane.prototype.initialize = function(scene) {
-    var loader = new THREE.OBJMTLLoader();
-    var plane = this;
     this.collision = new THREE.Mesh( new THREE.SphereGeometry( 8, 4, 4 ) ,
       new THREE.MeshBasicMaterial( { color: 0x00aaff } )  );
     this.collision.scale.set(1,0.16,1.5);
+
+    var loader = new THREE.OBJMTLLoader();
+    var plane = this;
     loader.load('models/Su-47_Berkut.obj', 'models/Su-47_Berkut.mtl',
       function ( object ) {
         object.rotateX(-Math.PI / 2);
-        plane.mesh = object;
         scene.add( object );
+        plane.mesh = object;
         plane.exhaust = new Exhaust(plane);
         plane.ready = true;
       },
@@ -492,15 +509,15 @@ function Game() {
       radius: 0.2,
     }
 
-    var default_offset = { x: 0.8, y: 0.4, z: 3 };
-    var turning_offset = { x: 0.8, y: -0.02, z: 3, y_multiplier: 0.4 };
+    var default_offset = { x: 0.8, y: 0.4, z: 5 };
+    var turning_offset = { x: 0.8, y: -0.02, z: 5, y_multiplier: 0.4 };
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, 1));
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, -1));
   }
 
-  Exhaust.prototype.plane_move = function(parent_position, rotation_x, rotation_y) {
+  Exhaust.prototype.move = function(parent_position, rotation_x, rotation_y, max_rotations) {
     for (var i = 0; i < this.particle_systems.length; i++)
-      this.particle_systems[i].move(parent_position, rotation_x, rotation_y, PLANE_MAX_ROTATIONS);
+      this.particle_systems[i].move(parent_position, rotation_x, rotation_y, max_rotations);
   }
 
   Exhaust.prototype.initialize_for_iron_man = function (parent) {
@@ -535,11 +552,6 @@ function Game() {
     turning_offset = { x: 1.0, y: -0.01, z: -3, y_multiplier: 1 };
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, 1));
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, -1));
-  }
-
-  Exhaust.prototype.iron_man_move = function(parent_position, rotation_x, rotation_y) {
-    for (var i = 0; i < this.particle_systems.length; i++)
-      this.particle_systems[i].move(parent_position, rotation_x, rotation_y, PLANE_MAX_ROTATIONS);
   }
 
   Exhaust.prototype.toggle_visible = function() {
@@ -780,6 +792,11 @@ function Game() {
       return;
     }
     this.choose_direction(bullets, terrains);
+    this.update_position();
+    this.animate();
+  }
+
+  IronMan.prototype.update_position = function() {
     this.speed_x = this.rotations_x * IRON_MAN_SPEED_X / IRON_MAN_MAX_ROTATIONS;
     this.speed_y = this.rotations_y * IRON_MAN_SPEED_Y / IRON_MAN_MAX_ROTATIONS;
 
@@ -797,9 +814,12 @@ function Game() {
       this.direction_y = 0;
     }
 
-    this.rotate();
     this.collision.position.setVector(this.mesh.position);
-    this.exhaust.iron_man_move(this.mesh.position, this.rotations_x, this.rotations_y);
+  }
+
+  IronMan.prototype.animate = function() {
+    this.rotate();
+    this.exhaust.move(this.mesh.position, this.rotations_x, this.rotations_y, IRON_MAN_MAX_ROTATIONS);
   }
 
   IronMan.prototype.collision_detected = function(bullets, terrains) {
