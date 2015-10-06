@@ -7,7 +7,7 @@ function Game() {
   var move_interval;
   var scene, renderer, camera, current_scene, current_camera;
   var width = window.innerWidth - 20, height = window.innerHeight - 20;
-  var is_started = false, is_paused = false, is_lose = false, is_won = false;
+  var is_started = false, is_paused = false, is_end = false;
   var loaded_models = 0;
   var frame_id;
 
@@ -179,6 +179,15 @@ function Game() {
     move_interval = setInterval(move_objects, 10);
   }
 
+  function restart() {
+    end_text.remove();
+    is_end = false;
+    plane.reset();
+    iron_man.reset();
+    clearInterval(move_interval);
+    move_interval = setInterval(move_objects, 10);
+  }
+
   function increase_loaded_models() {
     loaded_models++;
     if (loaded_models >= MODELS_COUNT) 
@@ -206,13 +215,16 @@ function Game() {
   function move_objects() {
     if (plane.move(terrains_container) == true) {
       clearInterval(move_interval);
-      lose_text = new Text(camera.position.x - 15, camera.position.y - 10 ,0, "SMASHED");
+      is_end = true;
+      end_text = new Text(camera.position.x - 15, camera.position.y - 10 ,0, "GAME OVER");
       move_interval = setInterval(lose_animation, 10);
       return;
     }
 
     if (iron_man.move(plane.bullets_container, terrains_container)) {
       won_animation();
+      is_end = true;
+      end_text = new Text(camera.position.x - 15, camera.position.y - 10 ,0, "YOU WIN!");
       return;
     }
     enviroment.move();
@@ -233,7 +245,7 @@ function Game() {
   }
 
   function lose_animation() {
-    lose_text.mesh.material.opacity = 1 + Math.sin(new Date().getTime() * .015);
+    end_text.mesh.material.opacity = 1 + Math.sin(new Date().getTime() * .015);
     terrains_container.hide();
     if (!plane.exploded) 
       plane.explosion();
@@ -257,6 +269,11 @@ function Game() {
 
       if (is_started == false)
         return;
+
+      if (keys[13] && is_end == true) {
+        restart();
+        return;
+      }
 
       var direction_x = 0;
       var direction_y = 0; 
@@ -445,7 +462,7 @@ function Game() {
     this.animate();
     this.bullets_container.move(this.mesh.position, this.is_shooting);
 
-    return true;
+    return false;
   }
 
   Plane.prototype.reload = function() {
@@ -539,6 +556,7 @@ function Game() {
         scene.add( object );
         plane.mesh = object;
         plane.exhaust = new Exhaust(plane);
+        plane.default_rotation = plane.mesh.rotation;
         plane.ready = true;
         increase_loaded_models();
       },
@@ -549,6 +567,13 @@ function Game() {
         console.log( 'An error happened' );
       }
     );
+  }
+
+  Plane.prototype.reset = function() {
+    this.mesh.rotation.setVector(this.default_rotation);
+    this.mesh.position.set(0,0,-130);
+    if (this.exploded) this.cancel_exploison();
+    this.exploded = false;
   }
 
   Plane.prototype.explosion = function() {
@@ -578,10 +603,6 @@ function Game() {
     if (this.exploison_circles > PLANE_EXPLOISON_CIRCLES) {
       this.exploded = true;
       this.exploison_circles = 0;
-      this.explosion_vertices = [];
-      this.explosion_rotations = [];
-      this.explosion_mesh.remove();
-      delete this.explosion_mesh;
     }
   }
 
@@ -593,6 +614,11 @@ function Game() {
       this.mesh.children[i].position.z -= this.explosion_vertices[i].z * (PLANE_EXPLOISON_CIRCLES + 1);
       this.mesh.children[i].rotation.set(0,0,0);
     }
+
+    this.explosion_vertices = [];
+    this.explosion_rotations = [];
+    this.explosion_mesh.remove();
+    delete this.explosion_mesh;
   }
 
   Plane.prototype.collision_detected = function(terrains) {
@@ -815,6 +841,7 @@ function Game() {
         iron_man.mesh.scale.set(3, 3, 3);
         iron_man.scene.add( iron_man.mesh );
         iron_man.exhaust = new Exhaust(iron_man);
+        iron_man.default_rotation = iron_man.mesh.rotation;
         iron_man.ready = true;
         increase_loaded_models();
       }
@@ -826,6 +853,15 @@ function Game() {
     this.collision.scale.set(1.1,0.6,3);
     this.collision.position.z = -134;
     // scene.add(this.collision);
+  }
+
+  IronMan.prototype.reset = function() {
+    this.mesh.rotation.setVector(this.default_rotation);
+    this.mesh.position.set(0,0,-130);
+    if (this.exploded) this.cancel_exploison();
+    this.exploded = false;
+    this.health = 100;
+    this.update_health_bar();
   }
 
   IronMan.prototype.is_dead = function(bullets, terrains) {
@@ -893,6 +929,7 @@ function Game() {
       this.health = 100;
       this.update_health_bar();
       delete this.explosion_mesh;
+      this.exploded = true;
       return;
     }
 
