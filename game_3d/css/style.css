@@ -1,0 +1,3 @@
+.progress {
+  width: 200px; opacity: 0.9; cursor: pointer; position: absolute; right: 40px; bottom: 20px;
+}

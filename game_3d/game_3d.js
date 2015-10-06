@@ -25,10 +25,13 @@ function Game() {
   var BULLETS_MAX_COUNT = 26;
   var RELOAD_TIME = 5;
 
+  var IRON_MAN_MAX_HEALTH = 100;
+  var IRON_HEALTH_DECREASE_STEP = 10;
   var IRON_MAN_MAX_ROTATIONS = 8;
   var IRON_MAN_ANGLE_STEP_X = 0.05, IRON_MAN_ANGLE_STEP_Y = 0.005;
   var BOOM_SPEED = 20;
   var IRON_MAN_EXPLOISON_CIRCLES = 100;
+  var IRON_MAN_HIT_CIRCLES = 10;
   var IRON_MAN_SPEED_X = 0.3, IRON_MAN_SPEED_Y = 0.2;
   var IRON_MAN_RADAR_RADIUS = 10, IRON_MAN_TERRAINS_RADIUS = 2500;
 
@@ -220,7 +223,7 @@ function Game() {
   TerrainsContainer.prototype.collision_detected = function(mesh) {
     var collidable_mesh_list = [], local_vertex, global_vertex, direction_vector;
     for (var i = 0; i < this.in_game_area.length; i++) {
-      if (Math.abs(this.in_game_area[i].mesh.position.length() - mesh.position.length()) < 220)
+      if (Math.abs(this.in_game_area[i].mesh.position.x - mesh.position.x) < 300)
         collidable_mesh_list.push(this.in_game_area[i].mesh);
     }
 
@@ -252,7 +255,7 @@ function Game() {
     var parameters = {
       alea: RAND_MT,
       generator: PN_GENERATOR,
-      width: 50 + Math.random() * 50,
+      width: 150 + Math.random() * 50,
       height: 100 + Math.random() * 100,
       widthSegments: 20,
       heightSegments: 20,
@@ -444,7 +447,7 @@ function Game() {
       this.mesh.children[i].rotation.z += this.explosion_rotations[i].z;
     }
 
-    this.explosion_mesh.update();
+    this.explosion_mesh.move();
 
     if (this.exploison_circles > PLANE_EXPLOISON_CIRCLES) {
       this.exploison_circles = 0;
@@ -608,9 +611,10 @@ function Game() {
     this.initialize_mesh(position, color);
   }
 
-  Exploison.prototype.update = function() {
+  Exploison.prototype.move = function(position) {
     this.particle_group.mesh.scale.set(this.scaler, this.scaler, this.scaler);
     this.particle_group.tick();
+    if (position) this.particle_group.mesh.position.setVector(position);
     this.scaler += 0.2;
   }
 
@@ -660,17 +664,18 @@ function Game() {
   function IronMan (scene) {
     this.direction_x = 0;
     this.direction_y = 0;
+    this.health = 100;
     this.scene = scene;
-    this.initialize_mesh();
-    this.initialize_explosion_mesh();
+    this.initialize();
     this.exploison_circles = 0;
+    this.hit_circles = 0;
     this.rotations_x = 0;
     this.rotations_y = 0;
     this.explosion_vertices = [];
     this.explosion_rotations = [];
   }
 
-  IronMan.prototype.initialize_mesh = function() {
+  IronMan.prototype.initialize = function() {
     var loader = new THREE.OBJMTLLoader();
     var iron_man = this;
 
@@ -695,20 +700,54 @@ function Game() {
     // scene.add(this.collision);
   }
 
-  IronMan.prototype.initialize_explosion_mesh = function() {
-    this.explosion_mesh = new THREE.Mesh( new THREE.SphereGeometry( 1, 16, 8 ) ,
-      new THREE.MeshBasicMaterial( { color: 0x00aaff } )
-    );
+  IronMan.prototype.is_dead = function(bullets, terrains) {
+    if (this.exploison_circles > 0) {
+      this.explosion();
+      return true;
+    }
+
+    var collision_value = this.collision_detected(bullets, terrains);
+
+    if (collision_value < 0) {
+      this.explosion();
+      return true;
+    }
+
+    if (collision_value > 0) {
+      this.health -= 10 + Math.round(5 * Math.random());
+      if (this.health <= 0) {
+        this.explosion();
+        return true;
+      } else {
+        this.hit_circles = 0;
+        this.hit();
+        return false;
+      }
+    }
+
+    if (this.hit_circles > 0) {
+      this.hit();
+      return false;
+    }
+
+    return false;
   }
 
   IronMan.prototype.explosion = function() {
     if (this.exploison_circles == 0) {
+      this.health = 0;
+      this.hit_circles = 0;
+      this.update_health_bar();
       this.exploison_circles = 1;
       for (var  i = 0; i < this.mesh.children.length; i++)
         this.explosion_vertices[i] = new THREE.Vector3(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
 
       for (var  i = 0; i < this.mesh.children.length; i++)
         this.explosion_rotations[i] = new THREE.Euler(1 - 2 * Math.random(), 1 - 2 * Math.random(), 3 - 2 * Math.random());
+      if (this.explosion_mesh) {
+        this.explosion_mesh.remove();
+        delete this.explosion_mesh;
+      }
       this.explosion_mesh = new Exploison(this.mesh.position.clone(), IRON_MAN_EXPLOISON_CIRCLES, 'blue');
     }
 
@@ -722,13 +761,45 @@ function Game() {
       this.explosion_mesh.remove();
       this.cancel_exploison();
       this.explosion_vertices = [];
-      this,explosion_rotations = [];
+      this.explosion_rotations = [];
+      this.health = 100;
+      this.update_health_bar();
       delete this.explosion_mesh;
       return;
     }
 
-    this.explosion_mesh.update();
+    this.explosion_mesh.move();
     this.exploison_circles += 1;
+  }
+
+  IronMan.prototype.update_health_bar = function() {
+    var health_value = this.health
+    if (health_value < 0) health_value = 1;
+    color = { r: Math.round(255 * (1 - this.health / (1.7 * IRON_MAN_MAX_HEALTH))) , 
+      g: Math.round(255 * this.health * 1.2 / IRON_MAN_MAX_HEALTH), b: 0 };
+    color_string = "rgb(" + color.r + "," + color.g + "," + color.b + ');';
+    $('.progress-bar.progress-bar-success').attr('style', 'width:' + this.health + '%;background-color:' + color_string );
+  }
+
+  IronMan.prototype.hit = function() {
+    if (this.hit_circles == 0) {
+      this.update_health_bar();
+      this.hit_circles = 1;
+      if (this.explosion_mesh) {
+        this.explosion_mesh.remove();
+        delete this.explosion_mesh;
+      }
+      this.explosion_mesh = new Exploison(this.mesh.position.clone(), IRON_MAN_EXPLOISON_CIRCLES, 'orange');
+    }
+
+    this.explosion_mesh.move(this.position);
+    this.hit_circles += 1;
+
+    if (this.hit_circles > IRON_MAN_HIT_CIRCLES) {
+      this.hit_circles = 0;
+      this.explosion_mesh.remove();
+      delete this.explosion_mesh;
+    }
   }
 
   IronMan.prototype.cancel_exploison = function() {
@@ -787,11 +858,8 @@ function Game() {
   }
 
   IronMan.prototype.move = function(bullets, terrains) {
-    if (this.exploison_circles > 0 || this.collision_detected(bullets, terrains)) {
-      this.explosion();
-      return;
-    }
-    this.choose_direction(bullets, terrains);
+    if (this.is_dead(bullets, terrains)) return;
+    // this.choose_direction(bullets, terrains);
     this.update_position();
     this.animate();
   }
@@ -823,9 +891,9 @@ function Game() {
   }
 
   IronMan.prototype.collision_detected = function(bullets, terrains) {
-    if (bullets.collision_detected(this) || terrains.collision_detected(this.collision))
-      return true;
-    return false
+    if (bullets.collision_detected(this)) return 1;
+    if (terrains.collision_detected(this.collision)) return -1;
+    return 0;
   }
 
   IronMan.prototype.rotate = function() {
@@ -1033,7 +1101,7 @@ function Game() {
 
   BulletsContainer.prototype.initialize = function(scene) {
     this.mesh = new THREE.Mesh(new THREE.BoxGeometry( 0.13, 0.13, 8 ),
-      new THREE.MeshPhongMaterial( { color: 0xFF0000, specular: 0x555555, shininess: 30 })
+      new THREE.MeshBasicMaterial( { color: 0xFF0A00, specular: 0x555555, shininess: 30 })
     );
 
     for (var i = 0; i < BULLETS_MAX_COUNT / 2; i++) {
@@ -1059,13 +1127,16 @@ function Game() {
   BulletsContainer.prototype.collision_detected = function(iron_man) {
     if (iron_man.exploison_circles != 0) return true;
     for (var i = 0; i < this.bullets.length; i++) {
-      if (this.bullets[i].mesh.position.x <= iron_man.mesh.position.x + 3 &&
+      if (this.bullets[i].mesh.visible == true &&
+          this.bullets[i].mesh.position.x <= iron_man.mesh.position.x + 3 &&
           this.bullets[i].mesh.position.x >= iron_man.mesh.position.x - 3 &&
           this.bullets[i].mesh.position.y <= iron_man.mesh.position.y + 1 &&
           this.bullets[i].mesh.position.y >= iron_man.mesh.position.y - 1 &&
           this.bullets[i].mesh.position.z > FRONT_BORDER_Z &&
-          this.bullets[i].mesh.position.z < FRONT_BORDER_Z + 6)
+          this.bullets[i].mesh.position.z < FRONT_BORDER_Z + 6) {
+        this.bullets[i].mesh.visible = false;
         return true;
+      }
     }
     return false;
   }
