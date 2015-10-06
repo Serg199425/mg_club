@@ -493,14 +493,14 @@ function Game() {
     }
 
     var default_offset = { x: 0.8, y: 0.4, z: 3 };
-    var turning_offset = { x: 0.8, y: 0.015, z: 3 };
+    var turning_offset = { x: 0.8, y: -0.02, z: 3, y_multiplier: 0.4 };
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, 1));
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, -1));
   }
 
   Exhaust.prototype.plane_move = function(parent_position, rotation_x, rotation_y) {
     for (var i = 0; i < this.particle_systems.length; i++)
-      this.particle_systems[i].move(parent_position, rotation_x, rotation_y / PLANE_MAX_ROTATIONS);
+      this.particle_systems[i].move(parent_position, rotation_x, rotation_y, PLANE_MAX_ROTATIONS);
   }
 
   Exhaust.prototype.initialize_for_iron_man = function (parent) {
@@ -526,20 +526,20 @@ function Game() {
       radius: 0.2,
     }
 
-    var default_offset = { x: 0.5, y: -0.4, z: 3 };
-    var turning_offset = { x: 0.5, y: -0.02, z: 3 };
+    var default_offset = { x: 0.5, y: 0.4, z: 3 };
+    var turning_offset = { x: 0.5, y: -0.02, z: 3, y_multiplier: 1 };
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, 1));
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, -1));
 
-    default_offset = { x: 0.5, y: -0.4, z: -10 };
-    turning_offset = { x: 0.5, y: -0.02, z: -10 };
+    default_offset = { x: 1.0, y: 0.3, z: -3 };
+    turning_offset = { x: 1.0, y: -0.01, z: -3, y_multiplier: 1 };
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, 1));
     this.particle_systems.push(new ParticleSystem(parameters, default_offset, turning_offset, parent.mesh.position, -1));
   }
 
   Exhaust.prototype.iron_man_move = function(parent_position, rotation_x, rotation_y) {
     for (var i = 0; i < this.particle_systems.length; i++)
-      this.particle_systems[i].move(parent_position, rotation_x, rotation_y / PLANE_MAX_ROTATIONS);
+      this.particle_systems[i].move(parent_position, rotation_x, rotation_y, PLANE_MAX_ROTATIONS);
   }
 
   Exhaust.prototype.toggle_visible = function() {
@@ -550,6 +550,7 @@ function Game() {
   function ParticleSystem(emitter_params, default_offset, turning_offset, parent_position, side) {
     this.default_offset = default_offset;
     this.turning_offset = turning_offset;
+    this.offset_y_multiplier;
     this.side = side;
     this.acceleration = emitter_params.acceleration;
     this.initialize(emitter_params, parent_position);
@@ -573,14 +574,17 @@ function Game() {
     scene.add( this.mesh );
   }
 
-  ParticleSystem.prototype.move = function(pos, rotation_x, rotation_y) {
+  ParticleSystem.prototype.move = function(pos, rotation_x, rotation_y, max_rotations) {
     if (rotation_x == 0)
-      this.mesh.position.set(pos.x + this.default_offset.x * this.side, pos.y + rotation_y, pos.z + this.default_offset.z);
+      this.mesh.position.set(pos.x + this.default_offset.x * this.side, 
+        pos.y + rotation_x * this.side * this.default_offset.y, pos.z + this.default_offset.z);
     else
-      this.mesh.position.set(pos.x + this.turning_offset.x * this.side, pos.y + rotation_y, pos.z + this.turning_offset.z);
+      this.mesh.position.set(pos.x + this.turning_offset.x * this.side, 
+        pos.y + rotation_x * this.side * this.turning_offset.y, pos.z + this.turning_offset.z);
 
+    this.mesh.position.y -= rotation_y * this.turning_offset.y_multiplier / max_rotations;
+    this.emitter.acceleration.set(this.acceleration.x, this.acceleration.y, -rotation_y);
     this.particle_group.tick();
-    this.emitter.acceleration.setVector(this.acceleration);
   }
 
   ParticleSystem.prototype.toggle_visible = function() {
