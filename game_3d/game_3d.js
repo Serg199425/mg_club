@@ -20,7 +20,7 @@ function Game() {
   var PLANE_ANGLE_STEP_X = 0.02, PLANE_ANGLE_STEP_Y = 0.005;
   var MAX_SPEED_X = 0.5, MAX_SPEED_Y = 0.5;
   var SPEED_UP_STEP = 5, SPEED_DOWN_STEP = 1;
-  var PLANE_EXPLOISON_CIRCLES = 100;
+  var PLANE_EXPLOISON_CIRCLES = 1000;
 
   var BULLET_BORDER_Z = -450;
   var BULLET_SPEED_Y = 10, BULLET_SPEED_Z = 8;
@@ -33,7 +33,7 @@ function Game() {
   var IRON_MAN_MAX_ROTATIONS = 8;
   var IRON_MAN_ANGLE_STEP_X = 0.05, IRON_MAN_ANGLE_STEP_Y = 0.005;
   var BOOM_SPEED = 20;
-  var IRON_MAN_EXPLOISON_CIRCLES = 100;
+  var IRON_MAN_EXPLOISON_CIRCLES = 5000;
   var IRON_MAN_HIT_CIRCLES = 10;
   var IRON_MAN_SPEED_X = 0.3, IRON_MAN_SPEED_Y = 0.2;
   var IRON_MAN_RADAR_RADIUS = 10, IRON_MAN_TERRAINS_RADIUS = 2500;
@@ -218,13 +218,15 @@ function Game() {
       is_end = true;
       end_text = new Text(camera.position.x - 20, camera.position.y - 10 , 30, "GAME OVER");
       move_interval = setInterval(lose_animation, 10);
+      iron_man.exhaust.toggle_visible();
       return;
     }
 
-    if (iron_man.move(plane.bullets_container, terrains_container)) {
-      won_animation();
+    if (iron_man.move(plane.bullets_container, terrains_container) == true) {
+      clearInterval(move_interval);
       is_end = true;
       end_text = new Text(camera.position.x - 15, camera.position.y - 10 ,0, "YOU WIN!");
+      move_interval = setInterval(won_animation, 10);
       return;
     }
     enviroment.move();
@@ -249,11 +251,15 @@ function Game() {
     terrains_container.hide();
     if (!plane.exploded) 
       plane.explosion();
-    iron_man.lose_animation();
+    iron_man.end_animation();
   }
 
   function won_animation() {
-
+    end_text.mesh.material.opacity = 1 + Math.sin(new Date().getTime() * .015);
+    terrains_container.hide();
+    if (!iron_man.exploded) 
+      iron_man.explosion();
+    plane.end_animation();
   }
 
   var keys = {};
@@ -359,6 +365,7 @@ function Game() {
         var ray_caster = new THREE.Raycaster( mesh.position, direction_vector.clone().normalize() );
         var results = ray_caster.intersectObjects( collidable_mesh_list );
         if ( results.length > 0 && results[0].distance < direction_vector.length()) {
+          delete local_vertex;
           return true;
         }
       }
@@ -452,6 +459,43 @@ function Game() {
     this.default_camera_position = camera.position.clone();
   }
 
+  Plane.prototype.initialize = function(scene) {
+    this.collision = new THREE.Mesh( new THREE.SphereGeometry( 8, 4, 4 ) ,
+      new THREE.MeshBasicMaterial( { color: 0x00aaff } )  );
+    this.collision.scale.set(1,0.16,1.5);
+
+    var loader = new THREE.OBJMTLLoader();
+    var plane = this;
+    loader.load('models/Su-47_Berkut.obj', 'models/Su-47_Berkut.mtl',
+      function ( object ) {
+        object.rotateX(-Math.PI / 2);
+        scene.add( object );
+        plane.mesh = object;
+        plane.exhaust = new Exhaust(plane);
+        plane.default_rotation = plane.mesh.rotation.clone();
+        plane.ready = true;
+        increase_loaded_models();
+      },
+      function ( xhr ) {
+        console.log( (xhr.loaded / xhr.total * 100) + '% loaded' );
+      },
+      function ( xhr ) {
+        console.log( 'An error happened' );
+      }
+    );
+  }
+
+  Plane.prototype.reset = function() {
+    this.camera.position.setVector(this.default_camera_position);
+    if (this.exploison_circles > 0) this.cancel_exploison();
+    this.exploded = false;
+    this.mesh.rotation.setVector(this.default_rotation);
+    this.mesh.position.set(0,0,0);
+    this.exploison_circles = 0;
+    this.rotations_y = 0;
+    this.rotations_x = 0;
+  }
+
   Plane.prototype.move = function(terrains) {
     if (this.exploison_circles != 0 || this.collision_detected(terrains)) {
       this.explosion();
@@ -464,7 +508,7 @@ function Game() {
     this.animate();
     this.bullets_container.move(this.mesh.position, this.is_shooting);
 
-    return true;
+    return false;
   }
 
   Plane.prototype.reload = function() {
@@ -545,42 +589,6 @@ function Game() {
     this.collision.rotation.z = - this.rotations_x * PLANE_ANGLE_STEP_X;
   }
 
-  Plane.prototype.initialize = function(scene) {
-    this.collision = new THREE.Mesh( new THREE.SphereGeometry( 8, 4, 4 ) ,
-      new THREE.MeshBasicMaterial( { color: 0x00aaff } )  );
-    this.collision.scale.set(1,0.16,1.5);
-
-    var loader = new THREE.OBJMTLLoader();
-    var plane = this;
-    loader.load('models/Su-47_Berkut.obj', 'models/Su-47_Berkut.mtl',
-      function ( object ) {
-        object.rotateX(-Math.PI / 2);
-        scene.add( object );
-        plane.mesh = object;
-        plane.exhaust = new Exhaust(plane);
-        plane.default_rotation = plane.mesh.rotation.clone();
-        plane.ready = true;
-        increase_loaded_models();
-      },
-      function ( xhr ) {
-        console.log( (xhr.loaded / xhr.total * 100) + '% loaded' );
-      },
-      function ( xhr ) {
-        console.log( 'An error happened' );
-      }
-    );
-  }
-
-  Plane.prototype.reset = function() {
-    this.camera.position.setVector(this.default_camera_position);
-    if (this.exploded) this.cancel_exploison();
-    this.exploded = false;
-    this.mesh.rotation.set(-Math.PI / 2, 0, 0);
-    this.mesh.position.set(0,0,0);
-    this.rotations_y = 0;
-    this.rotations_x = 0;
-  }
-
   Plane.prototype.explosion = function() {
     this.exploison_circles += 1;
     if (this.exploison_circles == 1) {
@@ -604,19 +612,17 @@ function Game() {
     }
 
     this.explosion_mesh.move();
+    this.bullets_container.move(this.mesh.position, false);
 
-    if (this.exploison_circles > PLANE_EXPLOISON_CIRCLES) {
-      this.exploded = true;
-      this.exploison_circles = 0;
-    }
+    if (this.exploison_circles > PLANE_EXPLOISON_CIRCLES) this.exploded = true;
   }
 
   Plane.prototype.cancel_exploison = function() {
     this.exhaust.toggle_visible();
     for (var i = 0; i < this.mesh.children.length; i++) {
-      this.mesh.children[i].position.x -= this.explosion_vertices[i].x * (PLANE_EXPLOISON_CIRCLES + 1);
-      this.mesh.children[i].position.y -= this.explosion_vertices[i].y * (PLANE_EXPLOISON_CIRCLES + 1);
-      this.mesh.children[i].position.z -= this.explosion_vertices[i].z * (PLANE_EXPLOISON_CIRCLES + 1);
+      this.mesh.children[i].position.x -= this.explosion_vertices[i].x * (this.exploison_circles);
+      this.mesh.children[i].position.y -= this.explosion_vertices[i].y * (this.exploison_circles);
+      this.mesh.children[i].position.z -= this.explosion_vertices[i].z * (this.exploison_circles);
       this.mesh.children[i].rotation.set(0,0,0);
     }
 
@@ -631,6 +637,13 @@ function Game() {
       return true;
     else
       return false;
+  }
+
+  Plane.prototype.end_animation = function() {
+    this.rotate();
+    this.mesh.position.z -= 10;
+    this.exhaust.move(this.mesh.position, this.rotations_x, this.rotations_y, PLANE_MAX_ROTATIONS);
+    this.bullets_container.move(this.mesh.position, false);
   }
 
   function Exhaust(source) {
@@ -861,13 +874,19 @@ function Game() {
   }
 
   IronMan.prototype.reset = function() {
-    if (this.exploded) this.cancel_exploison();
+    if (this.exploison_circles > 0) this.cancel_exploison();
+    this.exhaust.toggle_visible();
     this.exploded = false;
     this.health = 100;
     this.update_health_bar();
+
+    this.exploison_circles = 0;
+    this.hit_circles = 0;
+
     this.mesh.rotation.setVector(this.default_rotation);
     this.mesh.children[18].rotation.set(0,0,0);
     this.mesh.position.set(0,0,-130);
+
     this.rotations_y = 0;
     this.rotations_x = 0;
   }
@@ -906,11 +925,12 @@ function Game() {
   }
 
   IronMan.prototype.explosion = function() {
-    if (this.exploison_circles == 0) {
+    this.exploison_circles += 1;
+    if (this.exploison_circles == 1) {
       this.health = 0;
-      this.hit_circles = 0;
       this.update_health_bar();
       this.exploison_circles = 1;
+      this.exhaust.toggle_visible();
       for (var  i = 0; i < this.mesh.children.length; i++)
         this.explosion_vertices[i] = new THREE.Vector3(1 - 2 * Math.random(), 1 - 2 * Math.random(), 1 - 2 * Math.random());
 
@@ -928,13 +948,23 @@ function Game() {
       this.mesh.children[i].rotation.addSelf(this.explosion_rotations[i]);
     }
 
-    if (this.exploison_circles > IRON_MAN_EXPLOISON_CIRCLES) {
-      this.exploded = true;
-      return;
+    this.explosion_mesh.move();
+
+    if (this.exploison_circles > IRON_MAN_EXPLOISON_CIRCLES) this.exploded = true;
+  }
+
+  IronMan.prototype.cancel_exploison = function() {
+    for (var i = 0; i < this.mesh.children.length; i++) {
+      this.mesh.children[i].position.x -= this.explosion_vertices[i].x * (this.exploison_circles);
+      this.mesh.children[i].position.y -= this.explosion_vertices[i].y * (this.exploison_circles);
+      this.mesh.children[i].position.z -= this.explosion_vertices[i].z * (this.exploison_circles);
+      this.mesh.children[i].rotation.set(0,0,0);
     }
 
-    this.explosion_mesh.move();
-    this.exploison_circles += 1;
+    this.explosion_mesh.remove();
+    this.explosion_vertices = [];
+    this.explosion_rotations = [];
+    delete this.explosion_mesh;
   }
 
   IronMan.prototype.update_health_bar = function() {
@@ -965,24 +995,6 @@ function Game() {
       this.explosion_mesh.remove();
       delete this.explosion_mesh;
     }
-  }
-
-  IronMan.prototype.cancel_exploison = function() {
-    for (var i = 0; i < this.mesh.children.length; i++) {
-      this.mesh.children[i].position.x -= this.explosion_vertices[i].x * (IRON_MAN_EXPLOISON_CIRCLES + 1);
-      this.mesh.children[i].position.y -= this.explosion_vertices[i].y * (IRON_MAN_EXPLOISON_CIRCLES + 1);
-      this.mesh.children[i].position.z -= this.explosion_vertices[i].z * (IRON_MAN_EXPLOISON_CIRCLES + 1);
-      this.mesh.children[i].rotation.set(0,0,0);
-    }
-    this.exploded = false;
-    this.exploison_circles = 0;
-    this.explosion_mesh.remove();
-    this.cancel_exploison();
-    this.explosion_vertices = [];
-    this.explosion_rotations = [];
-    this.health = 100;
-    this.update_health_bar();
-    delete this.explosion_mesh;
   }
 
   IronMan.prototype.choose_direction = function(bullets, terrains) {
@@ -1032,10 +1044,11 @@ function Game() {
   }
 
   IronMan.prototype.move = function(bullets, terrains) {
-    if (this.is_dead(bullets, terrains)) return;
+    if (this.is_dead(bullets, terrains)) return true;
     this.choose_direction(bullets, terrains);
     this.update_position();
     this.animate();
+    return false;
   }
 
   IronMan.prototype.update_position = function() {
@@ -1096,9 +1109,9 @@ function Game() {
     }
   }
 
-  IronMan.prototype.lose_animation = function() {
-    if (Math.abs(this.mesh.position.y - camera.position.y - 2) >= 1)
-      this.mesh.position.y += sign(camera.position.y - this.mesh.position.y - 2);
+  IronMan.prototype.end_animation = function() {
+    if (Math.abs(this.mesh.position.y - (camera.position.y + 2)) >= 1)
+      this.mesh.position.y += sign((camera.position.y + 2) - this.mesh.position.y);
     if (Math.abs(this.mesh.position.x - camera.position.x) >= 1)
       this.mesh.position.x += sign(camera.position.x - this.mesh.position.x);
     if (this.mesh.rotation.x < Math.PI)
