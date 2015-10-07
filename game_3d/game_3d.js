@@ -73,6 +73,7 @@ function Game() {
     move_interval = setInterval(lose_animation, 10);
     iron_man.exhaust.toggle_visible();
     soundManager.sounds.boom.play();
+    soundManager.sounds.main.stop();
     soundManager.sounds.iron_man.play();
   }
 
@@ -81,6 +82,7 @@ function Game() {
     is_end = true;
     end_text = new Text(camera.position.x - 15, camera.position.y - 10 ,0, "YOU WIN!");
     move_interval = setInterval(won_animation, 10);
+    soundManager.sounds.main.stop();
     soundManager.sounds.boom.play();
     soundManager.sounds.plane.play();
   }
@@ -187,6 +189,7 @@ function Game() {
     is_started = true;
     $('.health').show();
     clearInterval(move_interval);
+    soundManager.sounds.main.play();
     move_interval = setInterval(move_objects, 10);
   }
 
@@ -199,6 +202,7 @@ function Game() {
     soundManager.sounds.plane.stop();
     soundManager.sounds.iron_man.stop();
     soundManager.sounds.boom.stop();
+    soundManager.sounds.main.play();
     move_interval = setInterval(move_objects, 10);
   }
 
@@ -228,23 +232,12 @@ function Game() {
 
   function move_objects() {
     if (plane.move(terrains_container) == true) {
-      clearInterval(move_interval);
-      is_end = true;
-      end_text = new Text(camera.position.x - 20, camera.position.y - 10 , 30, "GAME OVER");
-      move_interval = setInterval(lose_animation, 10);
-      iron_man.exhaust.toggle_visible();
-      soundManager.sounds.boom.play();
-      soundManager.sounds.iron_man.play();
+      game.destroy_plane();
       return;
     }
 
     if (iron_man.move(plane.bullets_container, terrains_container) == true) {
-      clearInterval(move_interval);
-      is_end = true;
-      end_text = new Text(camera.position.x - 15, camera.position.y - 10 ,0, "YOU WIN!");
-      move_interval = setInterval(won_animation, 10);
-      soundManager.sounds.boom.play();
-      soundManager.sounds.plane.play();
+      game.destroy_iron_man();
       return;
     }
     enviroment.move();
