@@ -46,7 +46,7 @@ function Game() {
 
   var TERRAINS_COUNT = 20, TERRAINS_INTERVAL = 4500;
   var TERRAIN_SPEED = 40;
-  var TERRAIN_REAR_BORDER_Z = 500;
+  var TERRAIN_REAR_BORDER_Z = 0;
 
   var CLOUDS_COUNT = 20, CLOUDS_INTERVAL_Z = 2000, CLOUD_SPEED_Z = 20;
 
@@ -234,8 +234,8 @@ function Game() {
   }
 
   function move_object_load_scene() {
-    text1.mesh.material.opacity = 1 + Math.sin(new Date().getTime() * .015);
-    text2.mesh.material.opacity = 1 + Math.sin(new Date().getTime() * .015);
+    text1.mesh.scale.y = 1 + 0.1 * Math.sin(new Date().getTime() * .015);
+    text2.mesh.scale.y = 1 + 0.1 * Math.sin(new Date().getTime() * .015);
     plane.move(terrains_container);
     enviroment.move();
     camera_vibration();
@@ -247,19 +247,21 @@ function Game() {
   }
 
   function lose_animation() {
-    end_text.mesh.material.opacity = 1 + Math.sin(new Date().getTime() * .015);
+    end_text.mesh.scale.y = 1 + 0.1 * Math.sin(new Date().getTime() * .015);
     terrains_container.hide();
     if (!plane.exploded) 
       plane.explosion();
     iron_man.end_animation();
+    enviroment.move_water();
   }
 
   function won_animation() {
-    end_text.mesh.material.opacity = 1 + Math.sin(new Date().getTime() * .015);
+    end_text.mesh.scale.y = 1 + 0.1 * Math.sin(new Date().getTime() * .015);
     terrains_container.hide();
     if (!iron_man.exploded) 
       iron_man.explosion();
     plane.end_animation();
+    enviroment.move_water();
   }
 
   var keys = {};
@@ -350,24 +352,23 @@ function Game() {
   }
 
   TerrainsContainer.prototype.collision_detected = function(mesh) {
-    var collidable_mesh_list = [], local_vertex, global_vertex, direction_vector;
+    var collidable_mesh_list = [], local_vertex, global_vertex, direction_vector, ray_caster, results;
     for (var i = 0; i < this.in_game_area.length; i++) {
-      if (Math.abs(this.in_game_area[i].mesh.position.x - mesh.position.x) < 300)
+      if (Math.abs(this.in_game_area[i].mesh.position.z - mesh.position.z) < 300)
         collidable_mesh_list.push(this.in_game_area[i].mesh);
     }
 
     if (collidable_mesh_list.length > 0)
       for (var i = 0; i < mesh.geometry.vertices.length; i++) {       
-        var local_vertex = mesh.geometry.vertices[i].clone();
-        var global_vertex = local_vertex.applyMatrix4(mesh.matrix);
-        var direction_vector = global_vertex.subVectors(mesh.position, global_vertex);
+        local_vertex = mesh.geometry.vertices[i].clone();
+        global_vertex = local_vertex.applyMatrix4(mesh.matrix);
+        direction_vector = global_vertex.subVectors(mesh.position, global_vertex);
 
-        var ray_caster = new THREE.Raycaster( mesh.position, direction_vector.clone().normalize() );
-        var results = ray_caster.intersectObjects( collidable_mesh_list );
-        if ( results.length > 0 && results[0].distance < direction_vector.length()) {
-          delete local_vertex;
+        ray_caster = new THREE.Raycaster( mesh.position, direction_vector.clone().normalize() );
+        results = ray_caster.intersectObjects( collidable_mesh_list );
+
+        if ( results.length > 0 && results[0].distance <= direction_vector.length())
           return true;
-        }
       }
 
     delete collidable_mesh_list;
@@ -392,7 +393,7 @@ function Game() {
     var parameters = {
       alea: RAND_MT,
       generator: PN_GENERATOR,
-      width: 150 + Math.random() * 50,
+      width: 100 + Math.random() * 100,
       height: 100 + Math.random() * 100,
       widthSegments: 20,
       heightSegments: 20,
@@ -411,6 +412,11 @@ function Game() {
     terrain.position.y = - BORDER_Y - 350;
     terrain.position.z = position_z;
     this.mesh = terrain;
+    this.box = new THREE.Box3().setFromObject( this.mesh );
+    if (this.box.max.x - this.box.min.x > 120 && Math.abs(this.mesh.position.x) < 40 )
+      this.mesh.scale.y = 0.5;
+    else
+      this.mesh.scale.y = 1.5;
     scene.add(terrain);
   }
 
@@ -426,6 +432,13 @@ function Game() {
 
     if (this.mesh.position.y < -BORDER_Y - 40)
       this.mesh.position.y ++;
+    else {
+      this.box = new THREE.Box3().setFromObject( this.mesh );
+      if (this.box.max.x - this.box.min.x > 120 && Math.abs(this.mesh.position.x) < 40 )
+        this.mesh.scale.y = 0.5;
+      else
+        this.mesh.scale.y = 1.5;
+    }
   }
 
   Terrain.prototype.hide = function() {
@@ -1035,10 +1048,13 @@ function Game() {
     }
 
     for (var i = 0; i < terrains.in_game_area.length; i++) {
-      if (Math.abs(Math.abs(terrains.in_game_area[i].mesh.position.x) - Math.abs(this.mesh.position.x)) < BORDER_X &&
-          Math.abs(Math.abs(terrains.in_game_area[i].mesh.position.z) - Math.abs(this.mesh.position.z)) < IRON_MAN_TERRAINS_RADIUS) {
-        this.direction_x = -sign(terrains.in_game_area[i].mesh.position.x);
-        break;
+      if (terrains.in_game_area[i].box.min.x - 10 < this.mesh.position.x &&
+          terrains.in_game_area[i].box.max.x + 10 > this.mesh.position.x &&
+          terrains.in_game_area[i].mesh.position.z > -IRON_MAN_TERRAINS_RADIUS) {
+        if ((terrains.in_game_area[i].box.max.y < BORDER_Y - 5) && (terrains.in_game_area[i].box.max.y > this.mesh.position.y - 5))
+          this.direction_y = 1;
+        else
+          this.direction_x = -sign(terrains.in_game_area[i].mesh.position.x);
       }
     }
   }
@@ -1127,13 +1143,15 @@ function Game() {
 
   function Enviroment(scene, directional_light) {
     this.objects = [];
+    this.water = [];
     this.initialize(scene, directional_light);
   }
 
   Enviroment.prototype.initialize = function(scene, directional_light) {
     new SkyBox(scene);
-    this.add(new Water(-WATER_PLANE_LENGTH / 2, scene, directional_light));
-    this.add(new Water(-WATER_PLANE_LENGTH * 1.5, scene, directional_light));
+    this.water.push(new Water(-WATER_PLANE_LENGTH / 2, scene, directional_light));
+    this.water.push(new Water(-WATER_PLANE_LENGTH * 1.5, scene, directional_light));
+    this.objects = this.objects.concat(this.water);
   } 
 
   Enviroment.prototype.add = function(object) {
@@ -1143,6 +1161,11 @@ function Game() {
   Enviroment.prototype.move = function() {
     for (var index in this.objects)
       this.objects[index].move();
+  }
+
+  Enviroment.prototype.move_water = function() {
+    for (var index in this.water)
+      this.water[index].move();
   }
 
   function Water(pos_z, scene, directional_light) {
