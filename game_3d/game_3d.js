@@ -67,11 +67,22 @@ function Game() {
   }
 
   this.destroy_plane = function() {
-    if (plane.ready) plane.explosion();
+    clearInterval(move_interval);
+    is_end = true;
+    end_text = new Text(camera.position.x - 20, camera.position.y - 10 , 30, "GAME OVER");
+    move_interval = setInterval(lose_animation, 10);
+    iron_man.exhaust.toggle_visible();
+    soundManager.sounds.boom.play();
+    soundManager.sounds.iron_man.play();
   }
 
   this.destroy_iron_man = function() {
-    if (iron_man.ready) iron_man.explosion();
+    clearInterval(move_interval);
+    is_end = true;
+    end_text = new Text(camera.position.x - 15, camera.position.y - 10 ,0, "YOU WIN!");
+    move_interval = setInterval(won_animation, 10);
+    soundManager.sounds.boom.play();
+    soundManager.sounds.plane.play();
   }
 
   function onWindowResize() {
@@ -185,6 +196,9 @@ function Game() {
     plane.reset();
     iron_man.reset();
     clearInterval(move_interval);
+    soundManager.sounds.plane.stop();
+    soundManager.sounds.iron_man.stop();
+    soundManager.sounds.boom.stop();
     move_interval = setInterval(move_objects, 10);
   }
 
@@ -219,6 +233,8 @@ function Game() {
       end_text = new Text(camera.position.x - 20, camera.position.y - 10 , 30, "GAME OVER");
       move_interval = setInterval(lose_animation, 10);
       iron_man.exhaust.toggle_visible();
+      soundManager.sounds.boom.play();
+      soundManager.sounds.iron_man.play();
       return;
     }
 
@@ -227,6 +243,8 @@ function Game() {
       is_end = true;
       end_text = new Text(camera.position.x - 15, camera.position.y - 10 ,0, "YOU WIN!");
       move_interval = setInterval(won_animation, 10);
+      soundManager.sounds.boom.play();
+      soundManager.sounds.plane.play();
       return;
     }
     enviroment.move();
@@ -991,6 +1009,7 @@ function Game() {
 
   IronMan.prototype.hit = function() {
     if (this.hit_circles == 0) {
+      soundManager.sounds.hit.play();
       this.update_health_bar();
       this.hit_circles = 1;
       if (this.explosion_mesh) {
@@ -1337,6 +1356,7 @@ function Game() {
   }
 
   BulletsContainer.prototype.add = function(parent_position) {
+    soundManager.sounds.shoot.play();
     for (var i = 0, bullets_added = 0; i < this.bullets.length && bullets_added < 2; i++)
       if (this.bullets[i].mesh.visible == false) {
         bullets_added++;
