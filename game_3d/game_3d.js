@@ -36,7 +36,7 @@ function Game() {
   var IRON_MAN_EXPLOISON_CIRCLES = 5000;
   var IRON_MAN_HIT_CIRCLES = 10;
   var IRON_MAN_SPEED_X = 0.3, IRON_MAN_SPEED_Y = 0.2;
-  var IRON_MAN_RADAR_RADIUS = 10, IRON_MAN_TERRAINS_RADIUS = 2500;
+  var IRON_MAN_RADAR_RADIUS = 10, IRON_MAN_TERRAINS_RADIUS = 3500;
 
   var MODELS_COUNT = 3;
   var WATER_SPEED = 10;
@@ -404,7 +404,7 @@ function Game() {
     var parameters = {
       alea: RAND_MT,
       generator: PN_GENERATOR,
-      width: 100 + Math.random() * 100,
+      width: 70 + Math.random() * 100,
       height: 100 + Math.random() * 100,
       widthSegments: 20,
       heightSegments: 20,
